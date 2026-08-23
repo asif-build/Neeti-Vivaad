@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowRight, MessageSquare, Navigation } from 'lucide-react';
+import { ArrowRight, MessageSquare } from 'lucide-react';
 
 export function NeetiHeroShowcase() {
   return (
@@ -22,7 +22,7 @@ export function NeetiHeroShowcase() {
 
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
-        {/* Top Split Layout: Headline Left + Indian Artwork Showcase Right */}
+        {/* Top Split Layout: Headline Left + Direct Indian Artwork Right */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center mb-8 md:mb-12">
           
           {/* Top Left: Headline & Description */}
@@ -58,43 +58,13 @@ export function NeetiHeroShowcase() {
 
           </div>
 
-          {/* Top Right: Clean Non-Watermarked Indian Artwork Graphic & Floating Agent Badges */}
-          <div className="lg:col-span-5 relative mt-4 lg:mt-0">
-            
-            {/* Sparkle Accent Icon */}
-            <div className="absolute -top-6 -right-2 text-[#3ecf8e] animate-pulse pointer-events-none z-20">
-              <svg viewBox="0 0 100 100" className="w-12 h-12 fill-current">
-                <path d="M50 0 C50 30 70 50 100 50 C70 50 50 70 50 100 C50 70 30 50 0 50 C30 50 50 30 50 0 Z" />
-              </svg>
-            </div>
-
-            {/* Floating Cursor Pill 1: Rajesh (Orange/Amber) */}
-            <div className="absolute -top-4 left-4 z-20 flex items-center gap-1 bg-[#ff9500] text-white text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-full shadow-md animate-bounce" style={{ animationDuration: '3s' }}>
-              <Navigation className="w-3 h-3 fill-current rotate-45" />
-              <span>Rajesh (SSO)</span>
-            </div>
-
-            {/* Floating Cursor Pill 2: Dr. Sharma (Yellow) */}
-            <div className="absolute top-1/2 -right-4 z-20 flex items-center gap-1 bg-[#ffcc00] text-black text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-full shadow-md">
-              <Navigation className="w-3 h-3 fill-current rotate-45" />
-              <span>Dr. Sharma</span>
-            </div>
-
-            {/* Floating Cursor Pill 3: Data Officer (Emerald Green) */}
-            <div className="absolute -bottom-4 right-12 z-20 flex items-center gap-1 bg-[#3ecf8e] text-[#171717] text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-full shadow-md">
-              <Navigation className="w-3 h-3 fill-current rotate-45" />
-              <span>Data Officer</span>
-            </div>
-
-            {/* Clean Non-Watermarked Indian Artwork Container */}
-            <div className="rounded-2xl bg-white border border-[#dfdfdf] shadow-2xl p-2.5 relative overflow-hidden group">
-              <img
-                src="/assets/india_art.jpg"
-                alt="India Official Statistical System Artwork"
-                className="w-full h-auto object-cover rounded-xl transition-transform duration-500 group-hover:scale-[1.02]"
-              />
-            </div>
-
+          {/* Top Right: Direct Artwork Graphic (No card container, no background box, no cursor pills/icons) */}
+          <div className="lg:col-span-5 flex items-center justify-center mt-4 lg:mt-0">
+            <img
+              src="/assets/india_art.jpg"
+              alt="India Official Statistical System Artwork"
+              className="w-full max-w-[500px] h-auto object-contain mix-blend-multiply"
+            />
           </div>
 
         </div>
