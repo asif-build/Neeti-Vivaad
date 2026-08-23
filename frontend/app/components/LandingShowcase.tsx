@@ -4,9 +4,10 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { 
   ArrowRight, ShieldCheck, Cpu, BookOpen, 
-  MessageSquare, BarChart3, Terminal, CheckCircle2, Play
+  MessageSquare, BarChart3, Terminal, CheckCircle2, Play, Users
 } from 'lucide-react';
 import { Logo } from './Logo';
+import { CrowdCanvas } from './ui/skiper39';
 
 export function LandingShowcase() {
   const [activeTab, setActiveTab] = useState<'SQL' | 'RAG' | 'DEBATE'>('DEBATE');
@@ -50,27 +51,27 @@ export function LandingShowcase() {
     <div className="bg-white text-[#171717] min-h-screen font-sans selection:bg-[#3ecf8e] selection:text-[#171717]">
       
       {/* HERO SECTION */}
-      <section className="pt-16 pb-16 md:pt-24 md:pb-20 max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="relative pt-16 pb-16 md:pt-24 md:pb-24 max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 text-center overflow-hidden">
         
         {/* Soft Pill Tag */}
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#fafafa] border border-[#dfdfdf] text-xs font-mono text-[#171717] mb-8">
+        <div className="relative z-10 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#fafafa] border border-[#dfdfdf] text-xs font-mono text-[#171717] mb-8">
           <span className="w-2 h-2 rounded-full bg-[#3ecf8e]" />
           <span>Built for MoSPI · Aligned with iGOT Karmayogi · Grounded in NSC Standards</span>
         </div>
 
         {/* Hero Headline (Display-XXL: 64px, weight 500, letter-spacing -1.92px) */}
-        <h1 className="text-4xl sm:text-6xl lg:text-[64px] font-medium tracking-[-1.92px] text-[#171717] max-w-5xl mx-auto leading-[1.1]">
+        <h1 className="relative z-10 text-4xl sm:text-6xl lg:text-[64px] font-medium tracking-[-1.92px] text-[#171717] max-w-5xl mx-auto leading-[1.1]">
           Intelligence Designed to Evolve
           <span className="inline-block w-3 h-3 rounded-full bg-[#3ecf8e] ml-2" />
         </h1>
 
         {/* Hero Subheadline */}
-        <p className="mt-6 text-base sm:text-[18px] text-[#707070] max-w-3xl mx-auto leading-[1.55] font-normal">
+        <p className="relative z-10 mt-6 text-base sm:text-[18px] text-[#707070] max-w-3xl mx-auto leading-[1.55] font-normal">
           A skill intelligence platform for India's Official Statistical System — mapping competency gaps, generating instant assessments, and training real judgment through AI-moderated policy debates.
         </p>
 
         {/* Primary & Secondary Buttons */}
-        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
+        <div className="relative z-10 mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link href="/dashboard" className="btn-primary-green px-5 py-2.5 text-sm shadow-xs">
             <span>Get Started</span>
             <ArrowRight className="w-4 h-4" />
@@ -156,6 +157,30 @@ export function LandingShowcase() {
           )}
 
         </div>
+      </section>
+
+      {/* CROWD CANVAS SECTION (Skiper39 Registry Integration) */}
+      <section className="relative py-16 border-t border-[#ededed] bg-[#fafafa] overflow-hidden min-h-[360px] flex flex-col items-center justify-center text-center">
+        <div className="relative z-10 space-y-2 max-w-xl mx-auto px-4 pointer-events-none">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-[#dfdfdf] text-[11px] font-mono text-[#707070] uppercase">
+            <Users className="w-3.5 h-3.5 text-[#3ecf8e]" />
+            <span>Interactive Official Ecosystem</span>
+          </div>
+          <h3 className="text-2xl font-medium tracking-tight text-[#171717]">
+            Empowering 2.4M+ Officers Across India
+          </h3>
+          <p className="text-xs text-[#707070] font-sans">
+            Continuous skill profiling and automated policy debate simulations for statistical officers.
+          </p>
+        </div>
+
+        {/* Skiper39 Crowd Canvas Component */}
+        <CrowdCanvas
+          src="/images/peeps/all-peeps.png"
+          rows={15}
+          cols={7}
+          className="absolute inset-0 w-full h-full pointer-events-none opacity-90"
+        />
       </section>
 
       {/* CORE MODULES FEATURE GRID */}
