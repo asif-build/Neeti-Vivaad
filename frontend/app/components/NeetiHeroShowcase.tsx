@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowRight, MessageSquare, Sparkles, Navigation } from 'lucide-react';
+import { ArrowRight, MessageSquare, Navigation } from 'lucide-react';
 
 export function NeetiHeroShowcase() {
   return (
@@ -22,8 +22,8 @@ export function NeetiHeroShowcase() {
 
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
-        {/* Top Split Layout: Headline Left + Floating Live Agent Showcase Right */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-8 md:mb-12">
+        {/* Top Split Layout: Headline Left + Indian Artwork Showcase Right */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center mb-8 md:mb-12">
           
           {/* Top Left: Headline & Description */}
           <div className="lg:col-span-7 space-y-4">
@@ -58,61 +58,41 @@ export function NeetiHeroShowcase() {
 
           </div>
 
-          {/* Top Right: Floating Live Debate Preview Card with Agent Cursors & Sparkles */}
+          {/* Top Right: Clean Non-Watermarked Indian Artwork Graphic & Floating Agent Badges */}
           <div className="lg:col-span-5 relative mt-4 lg:mt-0">
             
             {/* Sparkle Accent Icon */}
-            <div className="absolute -top-6 -right-2 text-[#3ecf8e] animate-pulse pointer-events-none">
+            <div className="absolute -top-6 -right-2 text-[#3ecf8e] animate-pulse pointer-events-none z-20">
               <svg viewBox="0 0 100 100" className="w-12 h-12 fill-current">
                 <path d="M50 0 C50 30 70 50 100 50 C70 50 50 70 50 100 C50 70 30 50 0 50 C30 50 50 30 50 0 Z" />
               </svg>
             </div>
 
-            {/* Floating Cursor Pill 1: Sarah / Rajesh (Orange/Amber) */}
-            <div className="absolute -top-4 left-6 z-20 flex items-center gap-1 bg-[#ff9500] text-white text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-full shadow-md animate-bounce" style={{ animationDuration: '3s' }}>
+            {/* Floating Cursor Pill 1: Rajesh (Orange/Amber) */}
+            <div className="absolute -top-4 left-4 z-20 flex items-center gap-1 bg-[#ff9500] text-white text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-full shadow-md animate-bounce" style={{ animationDuration: '3s' }}>
               <Navigation className="w-3 h-3 fill-current rotate-45" />
               <span>Rajesh (SSO)</span>
             </div>
 
-            {/* Floating Cursor Pill 2: Alex / Dr. Sharma (Yellow) */}
+            {/* Floating Cursor Pill 2: Dr. Sharma (Yellow) */}
             <div className="absolute top-1/2 -right-4 z-20 flex items-center gap-1 bg-[#ffcc00] text-black text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-full shadow-md">
               <Navigation className="w-3 h-3 fill-current rotate-45" />
               <span>Dr. Sharma</span>
             </div>
 
-            {/* Floating Cursor Pill 3: Noah / Privacy Officer (Emerald Green) */}
-            <div className="absolute -bottom-4 right-16 z-20 flex items-center gap-1 bg-[#3ecf8e] text-[#171717] text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-full shadow-md">
+            {/* Floating Cursor Pill 3: Data Officer (Emerald Green) */}
+            <div className="absolute -bottom-4 right-12 z-20 flex items-center gap-1 bg-[#3ecf8e] text-[#171717] text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-full shadow-md">
               <Navigation className="w-3 h-3 fill-current rotate-45" />
               <span>Data Officer</span>
             </div>
 
-            {/* Live Policy Debate Card Preview */}
-            <div className="rounded-2xl bg-[#1c1c1c] border border-white/10 text-white p-5 shadow-2xl space-y-3 relative overflow-hidden">
-              <div className="flex items-center justify-between border-b border-[#202020] pb-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                </div>
-                <span className="text-[10px] font-mono text-[#9a9a9a]">MOSPI-LIVE-DEBATE</span>
-              </div>
-
-              {/* Sample Debate Snippet */}
-              <div className="space-y-2 text-xs">
-                <div className="p-3 rounded-lg bg-[#202020] border border-white/5 space-y-1">
-                  <span className="text-[#3ecf8e] font-mono font-medium block text-[10px]">State Statistical Officer</span>
-                  <p className="text-[#dfdfdf] leading-relaxed text-[11px]">
-                    "Digital survey deployment reduces field error rates by 68%."
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-lg bg-[#202020] border border-white/5 space-y-1">
-                  <span className="text-[#4ade80] font-mono font-medium block text-[10px]">Data Privacy Officer</span>
-                  <p className="text-[#dfdfdf] leading-relaxed text-[11px]">
-                    "Must enforce k-anonymity (k&gt;=5) before open data release."
-                  </p>
-                </div>
-              </div>
+            {/* Clean Non-Watermarked Indian Artwork Container */}
+            <div className="rounded-2xl bg-white border border-[#dfdfdf] shadow-2xl p-2.5 relative overflow-hidden group">
+              <img
+                src="/assets/india_art.jpg"
+                alt="India Official Statistical System Artwork"
+                className="w-full h-auto object-cover rounded-xl transition-transform duration-500 group-hover:scale-[1.02]"
+              />
             </div>
 
           </div>
