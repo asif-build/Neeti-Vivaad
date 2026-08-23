@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+backend/venv/
+venv/
+
+# Next.js build output
+frontend/.next/
+frontend/out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Python / Django
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+backend/db.sqlite3
+backend/media/
+.env
+*.env.local
+
+# IDE & OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

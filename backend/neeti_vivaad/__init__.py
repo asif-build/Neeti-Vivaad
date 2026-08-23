@@ -1,0 +1,1 @@
+# Neeti Vivaad Django package
