@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Logo } from './Logo';
-import { UserCheck, Shield, ChevronDown } from 'lucide-react';
+import { UserCheck, Shield, ChevronDown, LogIn } from 'lucide-react';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -82,8 +82,9 @@ export function Navbar() {
             <ChevronDown className="w-3 h-3 text-[#707070]" />
           </button>
 
-          <Link href="/debate" className="btn-primary-green text-xs shadow-xs">
-            Start Debate
+          <Link href="/login" className="btn-primary-green text-xs shadow-xs">
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Sign In</span>
           </Link>
 
           {/* Mobile hamburger trigger */}
@@ -122,6 +123,13 @@ export function Navbar() {
               </Link>
             );
           })}
+          <Link
+            href="/login"
+            onClick={() => setMenuOpen(false)}
+            className="block px-3 py-2 rounded-[6px] text-sm font-medium text-[#171717] bg-[#3ecf8e]"
+          >
+            Sign In / Register
+          </Link>
         </div>
       )}
     </header>

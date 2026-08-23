@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { CrowdCanvas } from './ui/skiper39';
+import { NeetiHeroShowcase } from './NeetiHeroShowcase';
 
 export function LandingShowcase() {
   const [activeTab, setActiveTab] = useState<'SQL' | 'RAG' | 'DEBATE'>('DEBATE');
@@ -50,42 +51,11 @@ export function LandingShowcase() {
   return (
     <div className="bg-white text-[#171717] min-h-screen font-sans selection:bg-[#3ecf8e] selection:text-[#171717]">
       
-      {/* HERO SECTION */}
-      <section className="relative pt-16 pb-16 md:pt-24 md:pb-24 max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 text-center overflow-hidden">
-        
-        {/* Soft Pill Tag */}
-        <div className="relative z-10 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#fafafa] border border-[#dfdfdf] text-xs font-mono text-[#171717] mb-8">
-          <span className="w-2 h-2 rounded-full bg-[#3ecf8e]" />
-          <span>Built for MoSPI · Aligned with iGOT Karmayogi · Grounded in NSC Standards</span>
-        </div>
-
-        {/* Hero Headline (Display-XXL: 64px, weight 500, letter-spacing -1.92px) */}
-        <h1 className="relative z-10 text-4xl sm:text-6xl lg:text-[64px] font-medium tracking-[-1.92px] text-[#171717] max-w-5xl mx-auto leading-[1.1]">
-          Intelligence Designed to Evolve
-          <span className="inline-block w-3 h-3 rounded-full bg-[#3ecf8e] ml-2" />
-        </h1>
-
-        {/* Hero Subheadline */}
-        <p className="relative z-10 mt-6 text-base sm:text-[18px] text-[#707070] max-w-3xl mx-auto leading-[1.55] font-normal">
-          A skill intelligence platform for India's Official Statistical System — mapping competency gaps, generating instant assessments, and training real judgment through AI-moderated policy debates.
-        </p>
-
-        {/* Primary & Secondary Buttons */}
-        <div className="relative z-10 mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Link href="/dashboard" className="btn-primary-green px-5 py-2.5 text-sm shadow-xs">
-            <span>Get Started</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-          
-          <Link href="/debate" className="btn-secondary-outline px-5 py-2.5 text-sm">
-            <MessageSquare className="w-4 h-4 text-[#171717]" />
-            <span>See a Live Debate</span>
-          </Link>
-        </div>
-      </section>
+      {/* REPLACED HERO SECTION (Flim / Recent Design Inspired Showcase) */}
+      <NeetiHeroShowcase />
 
       {/* COMPOSITED PRODUCT UI MOCKUP (The Brand's Argument) */}
-      <section className="pb-20 max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-16 max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="rounded-[12px] bg-[#1c1c1c] border border-white/10 text-white shadow-2xl overflow-hidden p-6 md:p-8">
           
           {/* Mockup Header Tabs */}
@@ -159,9 +129,8 @@ export function LandingShowcase() {
         </div>
       </section>
 
-      {/* CROWD CANVAS SECTION (Skiper39 - Clean Crowd Animation without Text) */}
+      {/* CROWD CANVAS SECTION (Skiper39 - Clean Crowd Animation) */}
       <section className="relative py-16 border-t border-[#ededed] bg-[#fafafa] overflow-hidden min-h-[360px] flex items-center justify-center">
-        {/* Skiper39 Crowd Canvas Component */}
         <CrowdCanvas
           src="/images/peeps/all-peeps.png"
           rows={15}
@@ -240,46 +209,6 @@ export function LandingShowcase() {
           </div>
         </div>
       </section>
-
-      {/* SITE FOOTER */}
-      <footer className="border-t border-[#ededed] bg-white py-16 text-[#707070] text-xs font-sans">
-        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div className="space-y-3">
-            <Logo size="sm" />
-            <p className="text-xs text-[#707070] leading-[1.45]">
-              AI-Powered Skill Intelligence &amp; Policy Debate Platform for India's Official Statistical System.
-            </p>
-          </div>
-
-          <div>
-            <h4 className="font-medium text-[#171717] mb-3">Platform</h4>
-            <ul className="space-y-2 text-xs">
-              <li><Link href="/dashboard" className="hover:text-[#171717]">Learner Profile</Link></li>
-              <li><Link href="/courses" className="hover:text-[#171717]">iGOT Courses</Link></li>
-              <li><Link href="/quiz" className="hover:text-[#171717]">AI Quiz Studio</Link></li>
-              <li><Link href="/debate" className="hover:text-[#171717]">Neeti Vivaad Studio</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-medium text-[#171717] mb-3">Grounding Sources</h4>
-            <ul className="space-y-2 text-xs">
-              <li>MoSPI Annual Reports 2024-25</li>
-              <li>National Statistical Commission</li>
-              <li>India Data Quality Framework</li>
-              <li>NDSAP Data Privacy Rules</li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-medium text-[#171717] mb-3">Government Hackathon</h4>
-            <p className="text-xs text-[#707070] leading-[1.45] mb-2">
-              Problem Statement SIH26101 · Ministry of Statistics and Programme Implementation.
-            </p>
-            <span className="pill-tag-emerald">Verified RAG Active</span>
-          </div>
-        </div>
-      </footer>
 
     </div>
   );
