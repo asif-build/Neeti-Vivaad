@@ -1,13 +1,7 @@
-import json
 from django.conf import settings
+from neeti_vivaad.ai import AIServiceError, generate_text
 from .mospi_rag import MoSPIRAGStore
 from .models import DebateSession, DebateRound, AgentArgument, DecisionReport, FallacyChallenge
-
-try:
-    from google import genai
-    GENAI_AVAILABLE = True
-except ImportError:
-    GENAI_AVAILABLE = False
 
 AGENT_PERSONAS = [
     {
@@ -42,8 +36,6 @@ AGENT_PERSONAS = [
 
 def generate_agent_argument(persona, scenario_title, round_number, constraint, retrieved_doc):
     """Generates persona argument strictly grounded in retrieved MoSPI document."""
-    api_key = getattr(settings, 'GEMINI_API_KEY', '')
-    
     constraint_str = f" CURRENT CONSTRAINT: {constraint}" if constraint else ""
     doc_text = retrieved_doc['content']
     doc_code = retrieved_doc['doc_code']
@@ -60,17 +52,12 @@ CRITICAL MANDATE:
 
 Generate your response as plain text argument."""
 
-    if GENAI_AVAILABLE and api_key:
+    if getattr(settings, "NVIDIA_API_KEY", "").strip():
         try:
-            client = genai.Client(api_key=api_key)
-            resp = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt
-            )
-            if resp and resp.text:
-                return resp.text.strip(), f"Grounded in [{doc_code}]: {doc_title}", doc_code
-        except Exception as e:
-            print(f"Gemini API Debate error: {e}")
+            argument = generate_text(prompt, temperature=0.35, max_tokens=400)
+            return argument, f"Grounded in [{doc_code}]: {doc_title}", doc_code
+        except AIServiceError as exc:
+            print(f"NVIDIA API debate error: {exc}")
 
     # Grounded fallback argument generator
     if persona['code'] == 'SSO':
