@@ -7,14 +7,18 @@ import {
 } from 'recharts';
 import { 
   Award, AlertTriangle, BookOpen, MessageSquare, 
-  Sparkles, ArrowUpRight, TrendingUp, CheckCircle2, UserCheck
+  Sparkles, ArrowUpRight, TrendingUp, CheckCircle2, UserCheck, Shield, Play, HelpCircle, ArrowRight
 } from 'lucide-react';
 
-export default function LearnerDashboard() {
+export default function CandidateDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState<'OFFICIAL' | 'ADMIN'>('OFFICIAL');
 
   useEffect(() => {
+    const savedRole = localStorage.getItem('user_role') as 'OFFICIAL' | 'ADMIN';
+    if (savedRole) setRole(savedRole);
+
     fetch('http://127.0.0.1:8000/api/dashboard/learner/')
       .then(res => res.json())
       .then(d => {
@@ -47,6 +51,13 @@ export default function LearnerDashboard() {
           recommended_courses: [
             { id: 1, title: 'Digital Data Privacy, NDSAP Guidelines & k-Anonymity Standards', provider: 'iGOT Karmayogi / MeitY', match_percentage: 97.5, duration_hours: 4.5, difficulty: 'Intermediate' },
             { id: 2, title: 'Advanced Sampling Design & Multi-Stage Estimation', provider: 'iGOT Karmayogi / NSO Academy', match_percentage: 94.0, duration_hours: 6.0, difficulty: 'Advanced' }
+          ],
+          recent_quizzes: [
+            { id: 1, quiz_title: 'MOSPI-IDQF Data Quality Assessment', score_percentage: 85.0, attempted_at: '2026-08-22 14:30' },
+            { id: 2, quiz_title: 'NDSAP Microdata Anonymization Protocols', score_percentage: 78.0, attempted_at: '2026-08-20 11:15' }
+          ],
+          recent_debates: [
+            { id: 1, scenario_title: 'Continuous Digital Capture vs 5-Year Sample', category: 'Data Policy', status: 'CONCLUDED', created_at: '2026-08-23 16:45' }
           ]
         });
         setLoading(false);
@@ -56,7 +67,7 @@ export default function LearnerDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center text-[#171717] font-mono text-xs">
-        Loading Official Competency Profile...
+        Loading Candidate Profile...
       </div>
     );
   }
@@ -70,10 +81,12 @@ export default function LearnerDashboard() {
   return (
     <div className="min-h-screen bg-white text-[#171717] py-10 px-4 sm:px-6 lg:px-8 max-w-[1280px] mx-auto space-y-8 font-sans">
       
-      {/* Official Profile Banner */}
-      <div className="card-supa-light flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+
+
+      {/* Candidate Profile Banner */}
+      <div className="card-supa-light flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
         <div className="flex items-center gap-5">
-          <div className="w-14 h-14 rounded-[8px] bg-[#171717] text-[#3ecf8e] flex items-center justify-center font-medium text-xl">
+          <div className="w-14 h-14 rounded-[8px] bg-[#171717] text-[#3ecf8e] flex items-center justify-center font-medium text-xl shadow-inner">
             {data.user.first_name[0]}{data.user.last_name[0]}
           </div>
           <div>
@@ -82,14 +95,14 @@ export default function LearnerDashboard() {
                 {data.user.first_name} {data.user.last_name}
               </h1>
               <span className="pill-tag-emerald">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Official Profile Verified
+                <CheckCircle2 className="w-3.5 h-3.5" /> Candidate Profile Active
               </span>
             </div>
             <p className="text-xs font-mono text-[#707070] mt-1">
               {data.user.designation} · {data.user.department}
             </p>
             <p className="text-xs text-[#707070] mt-0.5">
-              Exp: {data.user.experience_years} Years · Edu: {data.user.education}
+              Experience: {data.user.experience_years} Years · Education: {data.user.education}
             </p>
           </div>
         </div>
@@ -113,16 +126,16 @@ export default function LearnerDashboard() {
         </div>
       </div>
 
-      {/* Grid: Competency Radar + Top Skill Gaps */}
+      {/* Grid: Candidate Competency Radar + Top Skill Gaps */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* Radar Chart */}
-        <div className="lg:col-span-6 card-supa-light space-y-4">
+        <div className="lg:col-span-6 card-supa-light space-y-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-[#ededed] pb-3">
             <h2 className="text-xs font-mono uppercase text-[#707070] font-medium flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#3ecf8e]" /> COMPETENCY DOMAIN LEVELS
+              <Sparkles className="w-4 h-4 text-[#3ecf8e]" /> CANDIDATE DOMAIN COMPETENCY
             </h2>
-            <span className="text-[11px] font-mono text-[#9a9a9a]">TARGET: 80+</span>
+            <span className="text-[11px] font-mono text-[#9a9a9a]">BENCHMARK: 80+</span>
           </div>
 
           <div className="h-[280px] w-full">
@@ -131,19 +144,19 @@ export default function LearnerDashboard() {
                 <PolarGrid stroke="#dfdfdf" />
                 <PolarAngleAxis dataKey="domain" tick={{ fill: '#707070', fontSize: 11 }} />
                 <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="#dfdfdf" />
-                <Radar name="Rajesh Kumar" dataKey="score" stroke="#3ecf8e" fill="#3ecf8e" fillOpacity={0.25} />
+                <Radar name={data.user.first_name} dataKey="score" stroke="#3ecf8e" fill="#3ecf8e" fillOpacity={0.25} />
               </RadarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Top Skill Gaps List */}
-        <div className="lg:col-span-6 card-supa-light space-y-4">
+        <div className="lg:col-span-6 card-supa-light space-y-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-[#ededed] pb-3">
             <h2 className="text-xs font-mono uppercase text-[#171717] font-medium flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-500" /> TOP IDENTIFIED SKILL GAPS
+              <AlertTriangle className="w-4 h-4 text-rose-500" /> IDENTIFIED SKILL GAPS FOR UPSKILLING
             </h2>
-            <span className="text-[11px] font-mono text-[#9a9a9a]">FAISS AUTO-ENGINE</span>
+            <span className="text-[11px] font-mono text-[#9a9a9a]">FAISS AUTO-MATCH</span>
           </div>
 
           <div className="space-y-3">
@@ -175,19 +188,19 @@ export default function LearnerDashboard() {
 
       </div>
 
-      {/* Recommended iGOT Courses */}
-      <div className="card-supa-light space-y-6">
-        <div className="flex items-center justify-between border-b border-[#ededed] pb-4">
+      {/* Recommended iGOT Courses Section */}
+      <div className="card-supa-light space-y-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#ededed] pb-4 gap-2">
           <div>
             <h2 className="text-xs font-mono uppercase text-[#707070] font-medium flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-[#3ecf8e]" /> RECOMMENDED iGOT KARMAYOGI COURSES
             </h2>
-            <h3 className="text-[22px] font-medium text-[#171717] tracking-tight mt-1">
-              Semantically Matched to Identified Skill Gaps via FAISS
+            <h3 className="text-[20px] font-medium text-[#171717] tracking-tight mt-1">
+              Personalized Learning Path to Close Gaps
             </h3>
           </div>
           <Link href="/courses" className="text-xs font-mono text-[#171717] hover:text-[#3ecf8e] flex items-center gap-1 font-medium">
-            View All Courses <ArrowUpRight className="w-3.5 h-3.5" />
+            Explore All Courses <ArrowUpRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
@@ -215,6 +228,63 @@ export default function LearnerDashboard() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Candidate Activity & Training Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        {/* Quick Assessments & Quiz Studio */}
+        <div className="card-supa-light space-y-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-[#ededed] pb-3">
+            <h3 className="text-xs font-mono uppercase text-[#707070] font-medium flex items-center gap-2">
+              <HelpCircle className="w-4 h-4 text-[#3ecf8e]" /> AI QUIZ &amp; ASSESSMENT HISTORY
+            </h3>
+            <Link href="/quiz" className="text-xs font-mono text-[#3ecf8e] hover:underline">
+              Take New Quiz →
+            </Link>
+          </div>
+
+          <div className="space-y-2">
+            {(data.recent_quizzes || []).map((q: any) => (
+              <div key={q.id} className="p-3 rounded-[6px] bg-[#fafafa] border border-[#ededed] flex items-center justify-between text-xs">
+                <div>
+                  <div className="font-medium text-[#171717]">{q.quiz_title}</div>
+                  <div className="text-[10px] text-[#707070] font-mono">{q.attempted_at}</div>
+                </div>
+                <span className="px-2.5 py-1 rounded-[4px] bg-emerald-50 text-emerald-700 font-mono font-medium border border-emerald-200">
+                  {q.score_percentage}% Score
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Policy Debate Simulations */}
+        <div className="card-supa-light space-y-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-[#ededed] pb-3">
+            <h3 className="text-xs font-mono uppercase text-[#707070] font-medium flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-[#3ecf8e]" /> NEETI SAARTHI POLICY DEBATES
+            </h3>
+            <Link href="/debate" className="text-xs font-mono text-[#3ecf8e] hover:underline">
+              Enter Arena →
+            </Link>
+          </div>
+
+          <div className="space-y-2">
+            {(data.recent_debates || []).map((d: any) => (
+              <div key={d.id} className="p-3 rounded-[6px] bg-[#fafafa] border border-[#ededed] flex items-center justify-between text-xs">
+                <div>
+                  <div className="font-medium text-[#171717]">{d.scenario_title}</div>
+                  <div className="text-[10px] text-[#707070] font-mono">{d.category} · {d.created_at}</div>
+                </div>
+                <span className="px-2.5 py-1 rounded-[4px] bg-[#171717] text-white font-mono text-[10px] font-medium">
+                  {d.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
       </div>
 
     </div>

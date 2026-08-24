@@ -1,25 +1,54 @@
 from django.db import models
 from core.models import User
 
-class DebateScenario(models.Model):
-    title = models.CharField(max_length=255)
-    category = models.CharField(max_length=100, default='Data Policy')  # Data Policy, Digital Governance, Field Operations, Ethics & Privacy
-    description = models.TextField()
-    initial_constraint = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+class ScenarioDifficulty(models.TextChoices):
+    BEGINNER = 'Beginner', 'Beginner'
+    INTERMEDIATE = 'Intermediate', 'Intermediate'
+    ADVANCED = 'Advanced', 'Advanced'
 
-    def __str__(self):
-        return f"{self.title} ({self.category})"
+class ScenarioStatus(models.TextChoices):
+    DRAFT = 'Draft', 'Draft'
+    ACTIVE = 'Active', 'Active'
+    ARCHIVED = 'Archived', 'Archived'
 
 class ReferenceDocument(models.Model):
     title = models.CharField(max_length=255)
     doc_code = models.CharField(max_length=50, unique=True)
     publisher = models.CharField(max_length=150, default='MoSPI / National Statistical Commission')
+    document_type = models.CharField(max_length=100, default='Official Policy Standard')
+    page_reference = models.CharField(max_length=100, default='Section 4.2')
     content = models.TextField()
     publication_year = models.IntegerField(default=2024)
+    is_indexed = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.title} [{self.doc_code}]"
+
+class DebateScenario(models.Model):
+    title = models.CharField(max_length=255)
+    category = models.CharField(max_length=100, default='Data Policy')  # Data Policy, Digital Governance, Field Operations, Ethics & Privacy
+    description = models.TextField()
+    initial_constraint = models.TextField(blank=True, null=True)
+    difficulty = models.CharField(max_length=30, choices=ScenarioDifficulty.choices, default=ScenarioDifficulty.INTERMEDIATE)
+    status = models.CharField(max_length=30, choices=ScenarioStatus.choices, default=ScenarioStatus.ACTIVE)
+    learning_objective = models.TextField(blank=True, null=True, default='Evaluate data collection policy trade-offs and ensure data privacy compliance.')
+    reference_sources = models.ManyToManyField(ReferenceDocument, blank=True, related_name='scenarios')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.title} ({self.category}) - {self.status}"
+
+class ScenarioConstraint(models.Model):
+    scenario = models.ForeignKey(DebateScenario, on_delete=models.CASCADE, related_name='constraints')
+    name = models.CharField(max_length=150)
+    description = models.TextField()
+    impact = models.TextField(blank=True, null=True)
+    trigger_round = models.IntegerField(default=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} (Round {self.trigger_round}) for {self.scenario.title}"
 
 class DebateSession(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='debates')

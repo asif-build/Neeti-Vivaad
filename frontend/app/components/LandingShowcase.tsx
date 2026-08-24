@@ -4,14 +4,53 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { 
   ArrowRight, ShieldCheck, Cpu, BookOpen, 
-  MessageSquare, BarChart3, Terminal, CheckCircle2, Play
+  MessageSquare, BarChart3, Terminal, CheckCircle2, Play,
+  Users, Award, Sparkles, Target, Zap, Layers, Briefcase, FileCheck, HelpCircle
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { CrowdCanvas } from './ui/skiper39';
 import { NeetiHeroShowcase } from './NeetiHeroShowcase';
 
 export function LandingShowcase() {
-  const [activeTab, setActiveTab] = useState<'SQL' | 'RAG' | 'DEBATE'>('DEBATE');
+
+  const features = [
+    {
+      title: 'FAISS Semantic Competency Mapping',
+      icon: Cpu,
+      badge: 'SKILL GAP ENGINE',
+      description: 'Continuous diagnostic benchmarking across Statistical Methodology, Technical Tools, Digital Governance, and Behavioural domains with automatic course matching.'
+    },
+    {
+      title: 'Grounded AI Assessment Studio',
+      icon: BookOpen,
+      badge: 'VERIFIED RAG',
+      description: 'Upload statistical survey manuals or ministry circulars. Generate instant, syllabus-grounded MCQs with zero hallucination and page-level citations.'
+    },
+    {
+      title: 'Multi-Agent Policy Debate Arena',
+      icon: MessageSquare,
+      badge: 'DECISION SIMULATOR',
+      description: 'Engage with 4 distinct AI stakeholder personas debating complex policy trade-offs. Spot logical fallacies and inject dynamic real-world constraints.'
+    },
+    {
+      title: 'Critical Thinking Quotient (CTQ)',
+      icon: Award,
+      badge: 'COGNITIVE METRIC',
+      description: 'Quantify officer analytical depth, fallacy detection accuracy, and decision consistency through structured judgment evaluation trees.'
+    },
+    {
+      title: 'Department-Wide Heatmap Analytics',
+      icon: BarChart3,
+      badge: 'LEADERSHIP INTELLIGENCE',
+      description: 'Provides Director Generals with macro visibility into division strengths, capability deficits, and training compliance across all field directorates.'
+    },
+    {
+      title: 'Smart e-Recruitment & Allocation',
+      icon: Briefcase,
+      badge: 'TALENT PLACEMENT',
+      description: 'Automatically matches tested officer proficiencies and CTQ ratings with high-priority vacancies for objective, merit-based deployment.'
+    }
+  ];
 
   const modules = [
     {
@@ -31,7 +70,7 @@ export function LandingShowcase() {
       linkText: 'Launch Quiz Studio'
     },
     {
-      title: 'Neeti Vivaad Debate',
+      title: 'Neeti Saarthi Debate',
       icon: MessageSquare,
       badge: 'MULTI-AGENT POLICY SIMULATOR',
       description: "Watch four AI stakeholders argue a real policy dilemma. Catch the fallacies. Sharpen your judgment.",
@@ -39,10 +78,10 @@ export function LandingShowcase() {
       linkText: 'Enter Debate Arena'
     },
     {
-      title: 'Admin Heatmap',
+      title: 'Admin Heatmap & e-Recruitment',
       icon: BarChart3,
       badge: 'DEPARTMENT INTELLIGENCE',
-      description: "See competency and decision-making strength across your entire department, not just one officer.",
+      description: "See competency, vacancy matching, and decision-making strength across your entire department.",
       link: '/admin-dashboard',
       linkText: 'Inspect Admin Metrics'
     }
@@ -51,85 +90,137 @@ export function LandingShowcase() {
   return (
     <div className="bg-white text-[#171717] min-h-screen font-sans selection:bg-[#3ecf8e] selection:text-[#171717]">
       
-      {/* REPLACED HERO SECTION (Flim / Recent Design Inspired Showcase) */}
+      {/* HERO SECTION */}
       <NeetiHeroShowcase />
 
-      {/* COMPOSITED PRODUCT UI MOCKUP (The Brand's Argument) */}
-      <section className="py-16 max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="rounded-[12px] bg-[#1c1c1c] border border-white/10 text-white shadow-2xl overflow-hidden p-6 md:p-8">
+      {/* 1) ABOUT SECTION (#about) */}
+      <section id="about" className="py-20 max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 border-b border-[#ededed]">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           
-          {/* Mockup Header Tabs */}
-          <div className="flex items-center justify-between border-b border-[#202020] pb-4 mb-6">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-rose-500/80" />
-              <span className="w-3 h-3 rounded-full bg-amber-500/80" />
-              <span className="w-3 h-3 rounded-full bg-emerald-500/80" />
-              <span className="text-xs font-mono text-[#9a9a9a] ml-2">mospi-ai-agent-kernel // neeti-vivaad-v2.6</span>
+          <div className="lg:col-span-6 space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#fafafa] border border-[#dfdfdf] text-xs font-mono text-[#171717]">
+              <span className="w-2 h-2 rounded-full bg-[#3ecf8e]" />
+              <span>About Neeti Saarthi · MoSPI SIH26101</span>
             </div>
 
-            <div className="flex items-center gap-2">
-              {(['DEBATE', 'RAG', 'SQL'] as const).map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-3 py-1 rounded-[4px] text-xs font-mono transition-colors ${
-                    activeTab === tab
-                      ? 'bg-[#3ecf8e] text-[#171717] font-medium'
-                      : 'text-[#9a9a9a] hover:text-white bg-[#202020]'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
+            <h2 className="text-3xl sm:text-4xl font-medium tracking-tight text-[#171717] leading-tight">
+              An AI-Driven Skill &amp; Decision Intelligence Platform for Indian Statistics
+            </h2>
+
+            <p className="text-base text-[#707070] leading-relaxed font-normal">
+              <strong>Neeti Saarthi</strong> is developed to transform statistical capacity building and strategic workforce deployment across India's Official Statistical System. Aligned directly with <strong>Mission Karmayogi (iGOT)</strong> and National Statistical Commission (NSC) quality guidelines, the platform bridges the critical gap between knowledge assessment, analytical thinking, and real-world policy governance.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <div className="p-4 rounded-[8px] bg-[#fafafa] border border-[#dfdfdf] space-y-1.5">
+                <div className="text-xs font-mono font-semibold uppercase text-[#171717] flex items-center gap-1.5">
+                  <Target className="w-4 h-4 text-[#24b47e]" />
+                  <span>Mission</span>
+                </div>
+                <p className="text-xs text-[#707070] leading-relaxed">
+                  Eliminate capability deficits and foster evidence-based statistical leadership across field and administrative units.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-[8px] bg-[#fafafa] border border-[#dfdfdf] space-y-1.5">
+                <div className="text-xs font-mono font-semibold uppercase text-[#171717] flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-[#644fc1]" />
+                  <span>Zero Hallucination</span>
+                </div>
+                <p className="text-xs text-[#707070] leading-relaxed">
+                  Strictly RAG-grounded in official MoSPI survey methodology, IDQF standards, and NDSAP data privacy mandates.
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* Tab Content Panels */}
-          {activeTab === 'DEBATE' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 rounded-[6px] bg-[#202020] border border-white/5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-[#3ecf8e] font-medium">State Statistical Officer</span>
-                  <span className="text-[10px] font-mono text-[#9a9a9a]">MOSPI-IDQF-2024</span>
+          {/* About Right Visual Cards */}
+          <div className="lg:col-span-6 space-y-4">
+            <div className="card-supa-light p-6 space-y-4 border border-[#dfdfdf] shadow-sm">
+              <span className="text-xs font-mono uppercase text-[#707070] tracking-wider block">Three Core Strategic Pillars</span>
+              
+              <div className="space-y-3">
+                <div className="flex items-start gap-3.5 p-3 rounded-[6px] bg-[#fafafa] border border-[#ededed]">
+                  <div className="w-8 h-8 rounded-full bg-[#171717] text-[#3ecf8e] flex items-center justify-center font-mono text-xs shrink-0 font-bold">
+                    01
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-[#171717] text-sm">Automated Competency Mapping</h4>
+                    <p className="text-xs text-[#707070] mt-0.5">FAISS vector engine diagnoses individual and departmental skill gaps against defined role targets.</p>
+                  </div>
                 </div>
-                <p className="text-xs text-[#dfdfdf] leading-relaxed">
-                  "Transitioning to digital surveys accelerates data processing from 18 months to 24 hours while maintaining 95% confidence intervals."
-                </p>
-              </div>
 
-              <div className="p-4 rounded-[6px] bg-[#202020] border border-white/5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-[#4ade80] font-medium">Data Privacy Officer</span>
-                  <span className="text-[10px] font-mono text-[#9a9a9a]">NDSAP-PRIVACY-2023</span>
+                <div className="flex items-start gap-3.5 p-3 rounded-[6px] bg-[#fafafa] border border-[#ededed]">
+                  <div className="w-8 h-8 rounded-full bg-[#171717] text-[#3ecf8e] flex items-center justify-center font-mono text-xs shrink-0 font-bold">
+                    02
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-[#171717] text-sm">Policy Debate &amp; Fallacy Hunter</h4>
+                    <p className="text-xs text-[#707070] mt-0.5">Multi-agent AI policy simulations sharpen officials' critical thinking, fallacy detection, and decision judgment.</p>
+                  </div>
                 </div>
-                <p className="text-xs text-[#dfdfdf] leading-relaxed">
-                  "Continuous microdata collection without tablet-level k-anonymity (k&gt;=5) violates Clause 12 privacy rules."
-                </p>
+
+                <div className="flex items-start gap-3.5 p-3 rounded-[6px] bg-[#fafafa] border border-[#ededed]">
+                  <div className="w-8 h-8 rounded-full bg-[#171717] text-[#3ecf8e] flex items-center justify-center font-mono text-xs shrink-0 font-bold">
+                    03
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-[#171717] text-sm">Smart e-Recruitment &amp; Placement</h4>
+                    <p className="text-xs text-[#707070] mt-0.5">Matches audited officer proficiencies with ministry vacancies for fast, transparent, merit-based allocations.</p>
+                  </div>
+                </div>
               </div>
             </div>
-          )}
-
-          {activeTab === 'RAG' && (
-            <div className="code-block-supa font-mono text-xs text-[#3ecf8e] space-y-1">
-              <div>&gt; QUERY_VECTOR: "Sampling design &amp; k-anonymity compliance"</div>
-              <div className="text-[#dfdfdf]">&gt; FAISS MATCH: MOSPI-IDQF-2024 (Similarity: 0.942)</div>
-              <div className="text-[#9a9a9a]">&gt; CITATION: "Section 4.2 Data Integrity: minimum confidence interval of 95%."</div>
-            </div>
-          )}
-
-          {activeTab === 'SQL' && (
-            <div className="code-block-supa font-mono text-xs text-[#dfdfdf] space-y-1">
-              <span className="text-[#3ecf8e]">SELECT</span> official_id, subskill_code, current_score, target_score<br/>
-              <span className="text-[#3ecf8e]">FROM</span> official_skill_proficiency<br/>
-              <span className="text-[#3ecf8e]">WHERE</span> (target_score - current_score) &gt; 25.0;<br/>
-              <span className="text-[#9a9a9a]">-- 4 rows returned in 12ms</span>
-            </div>
-          )}
+          </div>
 
         </div>
       </section>
 
-      {/* CROWD CANVAS SECTION (Skiper39 - Clean Crowd Animation) */}
+      {/* 2) FEATURES SECTION (#features) */}
+      <section id="features" className="py-20 max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 border-b border-[#ededed]">
+        <div className="mb-14 text-center max-w-3xl mx-auto space-y-3">
+          <h2 className="text-xs font-mono uppercase tracking-wider text-[#707070] font-medium">
+            PLATFORM CAPABILITIES
+          </h2>
+          <h3 className="text-3xl sm:text-4xl font-medium tracking-tight text-[#171717] leading-tight">
+            Designed for Comprehensive Statistical &amp; Policy Excellence
+          </h3>
+          <p className="text-base text-[#707070] leading-relaxed">
+            From automated syllabus parsing to multi-agent debate simulation and leadership talent management.
+          </p>
+        </div>
+
+        {/* Features 6-Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {features.map((feat, idx) => {
+            const IconC = feat.icon;
+            return (
+              <div
+                key={idx}
+                className="card-supa-light p-6 space-y-4 hover:border-[#c7c7c7] transition-all shadow-xs flex flex-col justify-between"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="p-2.5 rounded-[8px] bg-[#171717] text-[#3ecf8e]">
+                      <IconC className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-[#fafafa] border border-[#dfdfdf] text-[#707070]">
+                      {feat.badge}
+                    </span>
+                  </div>
+
+                  <h4 className="text-lg font-medium text-[#171717] tracking-tight">{feat.title}</h4>
+                  <p className="text-xs text-[#707070] leading-relaxed">{feat.description}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+
+
+      {/* CROWD CANVAS SECTION */}
       <section className="relative py-16 border-t border-[#ededed] bg-[#fafafa] overflow-hidden min-h-[360px] flex items-center justify-center">
         <CrowdCanvas
           src="/images/peeps/all-peeps.png"
@@ -137,53 +228,6 @@ export function LandingShowcase() {
           cols={7}
           className="absolute inset-0 w-full h-full pointer-events-none opacity-100"
         />
-      </section>
-
-      {/* CORE MODULES FEATURE GRID */}
-      <section className="py-16 max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 border-t border-[#ededed]">
-        <div className="mb-12">
-          <h2 className="text-xs font-mono uppercase tracking-wider text-[#707070] font-normal mb-2">
-            CORE PLATFORM MODULES
-          </h2>
-          <h3 className="text-[36px] font-medium tracking-[-0.72px] text-[#171717] leading-[1.15]">
-            End-to-End Skill Intelligence &amp; Decision Training
-          </h3>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {modules.map((mod, idx) => {
-            const IconComp = mod.icon;
-            return (
-              <div
-                key={idx}
-                className="card-supa-light space-y-6 flex flex-col justify-between hover:border-[#c7c7c7] transition-all"
-              >
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-[4px] bg-[#fafafa] border border-[#dfdfdf] text-[#707070]">
-                      {mod.badge}
-                    </span>
-                    <IconComp className="w-5 h-5 text-[#171717]" />
-                  </div>
-
-                  <h3 className="text-[22px] font-medium tracking-normal text-[#171717]">{mod.title}</h3>
-                  <p className="text-[16px] text-[#707070] leading-[1.5] font-normal">{mod.description}</p>
-                </div>
-
-                <div className="pt-4 border-t border-[#ededed] flex items-center justify-between">
-                  <span className="text-xs font-mono text-[#9a9a9a]">Grounded &amp; Auditable</span>
-                  <Link
-                    href={mod.link}
-                    className="text-sm font-medium text-[#171717] hover:text-[#3ecf8e] transition-colors flex items-center gap-1"
-                  >
-                    <span>{mod.linkText}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </section>
 
       {/* INVERTED DARK FEATURED CARD FOR DEBATE ARENA */}
@@ -202,9 +246,9 @@ export function LandingShowcase() {
               </p>
             </div>
 
-            <Link href="/debate" className="btn-primary-green px-5 py-2.5 text-sm whitespace-nowrap">
+            <Link href="/login" className="btn-primary-green px-5 py-2.5 text-sm whitespace-nowrap">
               <Play className="w-4 h-4" />
-              <span>Launch Neeti Vivaad Debate</span>
+              <span>Get started with Neeti Saarthi</span>
             </Link>
           </div>
         </div>

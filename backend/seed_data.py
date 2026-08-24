@@ -161,39 +161,165 @@ def seed():
         subs = SubSkill.objects.filter(code__in=cdata['subskill_codes'])
         c.target_subskills.set(subs)
 
-    # 4. Pre-seeded Debate Scenarios
+    # 4. Reference Documents (Official Grounding Sources)
+    from debate.models import ReferenceDocument, ScenarioConstraint
+
+    ref_idqf, _ = ReferenceDocument.objects.get_or_create(
+        doc_code='MOSPI-IDQF-2024',
+        defaults={
+            'title': 'India Data Quality Framework (IDQF) 2024 Standards',
+            'publisher': 'Ministry of Statistics and Programme Implementation',
+            'document_type': 'Official Policy Standard',
+            'page_reference': 'Section 4.2: Data Integrity & Precision',
+            'publication_year': 2024,
+            'is_indexed': True,
+            'content': 'All national sample surveys must maintain a minimum confidence interval of 95%. Automated anomaly detection must flag duplicate household records within 24 hours of submission.'
+        }
+    )
+
+    ref_ndsap, _ = ReferenceDocument.objects.get_or_create(
+        doc_code='NDSAP-PRIVACY-2023',
+        defaults={
+            'title': 'National Data Sharing and Accessibility Policy (NDSAP) Privacy Mandates',
+            'publisher': 'MeitY & MoSPI',
+            'document_type': 'Gazette Notification',
+            'page_reference': 'Clause 12: Microdata Masking',
+            'publication_year': 2023,
+            'is_indexed': True,
+            'content': 'Microdata dissemination requires k-anonymity (k>=5) and differential privacy noise addition before public release. PII must be stripped at tablet entry.'
+        }
+    )
+
+    ref_nsc, _ = ReferenceDocument.objects.get_or_create(
+        doc_code='NSC-SAMPLING-2024',
+        defaults={
+            'title': 'National Statistical Commission Guidelines on Multi-Stage Sampling',
+            'publisher': 'National Statistical Commission (NSC)',
+            'document_type': 'Technical Guidelines',
+            'page_reference': 'Chapter 3: Stratified Cluster Sampling',
+            'publication_year': 2024,
+            'is_indexed': True,
+            'content': 'Multi-stage stratified sampling with non-replacement cluster allocations must be maintained across all rural and urban blocks.'
+        }
+    )
+
+    ref_fod, _ = ReferenceDocument.objects.get_or_create(
+        doc_code='FOD-CAPI-MANUAL-2025',
+        defaults={
+            'title': 'NSO Field Operations Division CAPI Survey Manual',
+            'publisher': 'NSO Field Operations Directorate',
+            'document_type': 'Field Operations Manual',
+            'page_reference': 'SOP 8: Real-Time Verification',
+            'publication_year': 2025,
+            'is_indexed': True,
+            'content': 'CAPI handheld survey verification procedures, offline-first sync protocols, and field supervisor audit trails for all NSS rounds.'
+        }
+    )
+
+    # 5. Pre-seeded Debate Scenarios with References & Constraints
     scenarios_seed = [
         {
             'title': 'Direct Benefit Transfer (DBT) Survey Redesign: Continuous Digital Capture vs 5-Year Sample',
             'category': 'Data Policy',
             'desc': 'Debate on replacing traditional periodic paper sample surveys with real-time digital household microdata capture across rural and urban blocks.',
-            'constraint': 'Standard 2026 MoSPI Operational Budget'
+            'constraint': 'Standard 2026 MoSPI Operational Budget',
+            'difficulty': 'Intermediate',
+            'status': 'Active',
+            'learning_obj': 'Evaluate data velocity trade-offs against multi-stage confidence interval stability.',
+            'refs': [ref_idqf, ref_nsc],
+            'constraints': [
+                {'name': 'Budget Reduction (20%)', 'desc': 'Operational budget reduced by 20% due to mid-year austerity mandate.', 'impact': 'Forces prioritization of high-density survey blocks.', 'round': 2},
+                {'name': 'Offline Sync Deadline', 'desc': 'Mandatory end-of-day data synchronisation across all remote clusters.', 'impact': 'Requires fallback caching protocols.', 'round': 3}
+            ]
         },
         {
             'title': 'Mandatory Geo-tagging and Facial Verification in Agricultural Crop Yield Surveys',
             'category': 'Field Operations',
             'desc': 'Debate on enforcing mandatory real-time GPS boundary mapping and enumerator facial authentication during kharif harvest data collection.',
-            'constraint': 'Severe rural cellular network outage reported across 4 states'
+            'constraint': 'Severe rural cellular network outage reported across 4 states',
+            'difficulty': 'Advanced',
+            'status': 'Active',
+            'learning_obj': 'Analyze enumerator operational burden versus fraud elimination in crop cutting experiments.',
+            'refs': [ref_fod, ref_idqf],
+            'constraints': [
+                {'name': 'Cellular Blackout', 'desc': 'Complete loss of cellular connectivity across 4 target survey zones.', 'impact': 'Biometric verification must operate offline.', 'round': 2}
+            ]
         },
         {
             'title': 'Open Microdata Dissemination vs Strict Respondent Privacy under NDSAP 2024',
             'category': 'Ethics & Privacy',
             'desc': 'Debate on balancing public statistical transparency with respondent identity preservation using synthetic data generators and differential noise.',
-            'constraint': 'Compliance deadline shortened from 6 months to 30 days'
+            'constraint': 'Compliance deadline shortened from 6 months to 30 days',
+            'difficulty': 'Intermediate',
+            'status': 'Active',
+            'learning_obj': 'Determine optimal k-anonymity parameters without compromising econometric microdata utility.',
+            'refs': [ref_ndsap, ref_idqf],
+            'constraints': [
+                {'name': 'Accelerated Compliance Order', 'desc': 'High Court mandate requiring microdata release within 30 days.', 'impact': 'Precludes manual de-identification passes.', 'round': 2}
+            ]
         }
     ]
 
     for sc in scenarios_seed:
-        DebateScenario.objects.get_or_create(
+        scenario_obj, _ = DebateScenario.objects.get_or_create(
             title=sc['title'],
             defaults={
                 'category': sc['category'],
                 'description': sc['desc'],
-                'initial_constraint': sc['constraint']
+                'initial_constraint': sc['constraint'],
+                'difficulty': sc['difficulty'],
+                'status': sc['status'],
+                'learning_objective': sc['learning_obj']
             }
         )
+        scenario_obj.reference_sources.set(sc['refs'])
+        for con in sc['constraints']:
+            ScenarioConstraint.objects.get_or_create(
+                scenario=scenario_obj,
+                name=con['name'],
+                defaults={
+                    'description': con['desc'],
+                    'impact': con['impact'],
+                    'trigger_round': con['round']
+                }
+            )
 
-    # 5. Pre-seeded Quiz & Document
+    # 6. Additional Cohort Users for Workforce Analytics
+    cohort_officials = [
+        ('priya_sharma', 'Priya', 'Sharma', 'priya.sharma@mospi.gov.in', 'Survey Design & Research Division', 'Assistant Director (Statistics)', 9, 89.0),
+        ('ananya_sen', 'Ananya', 'Sen', 'ananya.sen@mospi.gov.in', 'Economic Statistics Division', 'Junior Statistical Officer', 4, 79.0),
+        ('vikram_singh', 'Vikramaditya', 'Singh', 'vikram.singh@mospi.gov.in', 'National Accounts Division', 'Statistical Investigator (Gr. I)', 6, 84.0),
+        ('amit_verma', 'Amit', 'Verma', 'amit.verma@mospi.gov.in', 'NSO Field Operations Division', 'Field Supervisor', 8, 77.5),
+        ('sunita_rao', 'Sunita', 'Rao', 'sunita.rao@mospi.gov.in', 'Survey Design & Research Division', 'Senior Statistical Officer', 11, 91.0)
+    ]
+
+    all_subskills = list(SubSkill.objects.all())
+    for uname, fname, lname, email, dept, desig, exp, ctq in cohort_officials:
+        u, created = User.objects.get_or_create(
+            username=uname,
+            defaults={
+                'first_name': fname,
+                'last_name': lname,
+                'email': email,
+                'role': UserRole.OFFICIAL,
+                'department': dept,
+                'designation': desig,
+                'experience_years': exp,
+                'education': 'M.Sc. Applied Statistics',
+                'ctq_score': ctq
+            }
+        )
+        if created:
+            u.set_password('official123')
+            u.save()
+            for s in all_subskills:
+                OfficialSkillProficiency.objects.get_or_create(
+                    user=u,
+                    subskill=s,
+                    defaults={'score': min(98.0, max(35.0, ctq + (hash(s.code + uname) % 25) - 10))}
+                )
+
+    # 7. Pre-seeded Quiz & Document
     doc, _ = DocumentUpload.objects.get_or_create(
         user=rajesh,
         title="MoSPI India Data Quality Framework (IDQF) 2024 Guidelines",
@@ -241,6 +367,19 @@ Enumerators operating in LWE (Left-Wing Extremism) affected or hilly terrains mu
     Option.objects.get_or_create(question=q2, option_text="k>=5", is_correct=True)
     Option.objects.get_or_create(question=q2, option_text="k>=10", is_correct=False)
     Option.objects.get_or_create(question=q2, option_text="No anonymity required", is_correct=False)
+
+    # 8. Quiz Attempts History
+    all_users = User.objects.filter(role=UserRole.OFFICIAL)
+    for u in all_users:
+        QuizAttempt.objects.get_or_create(
+            user=u,
+            quiz=quiz,
+            defaults={
+                'score_percentage': 85.0 if u.username == 'rajesh_kumar' else (75.0 + (hash(u.username) % 25)),
+                'total_questions': 2,
+                'correct_answers': 2
+            }
+        )
 
     print("--- Seeding Completed Successfully! ---")
 

@@ -8,8 +8,8 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' });
 
 export const metadata: Metadata = {
-  title: 'Neeti Vivaad | AI Skill Intelligence & Policy Debate Platform',
-  description: 'AI-powered Skill Intelligence & Learning Platform for officials in India\'s Official Statistical System (MoSPI SIH26101).',
+  title: 'Neeti Saarthi | AI Skill Intelligence, e-Recruitment & Policy Debate Platform',
+  description: 'AI-powered Skill Intelligence, e-Recruitment & Decision Training Platform for India\'s Official Statistical System (MoSPI SIH26101).',
 };
 
 export default function RootLayout({

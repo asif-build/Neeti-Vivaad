@@ -65,13 +65,35 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'neeti_vivaad.wsgi.application'
 
-# Database Configuration: SQLite default, PostgreSQL if configured via env
-DATABASES = {
-    'default': {
-        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': os.getenv('DB_NAME', BASE_DIR / 'db.sqlite3'),
+# Database Configuration: PostgreSQL (with fallback support)
+USE_POSTGRESQL = os.getenv('USE_POSTGRESQL', 'True').lower() in ('true', '1', 'yes')
+
+if os.getenv('DATABASE_URL'):
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=os.getenv('DATABASE_URL'),
+            conn_max_age=600
+        )
     }
-}
+elif USE_POSTGRESQL and os.getenv('DB_ENGINE', '').endswith('sqlite3'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.getenv('DB_NAME', BASE_DIR / 'db.sqlite3'),
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
+            'NAME': os.getenv('DB_NAME', 'neeti_vivaad'),
+            'USER': os.getenv('DB_USER', 'postgres'),
+            'PASSWORD': os.getenv('DB_PASSWORD', 'postgres'),
+            'HOST': os.getenv('DB_HOST', '127.0.0.1'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+        }
+    }
 
 # Custom User Model
 AUTH_USER_MODEL = 'core.User'
@@ -97,6 +119,11 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = ['*']
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https?://.*$",
+]
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

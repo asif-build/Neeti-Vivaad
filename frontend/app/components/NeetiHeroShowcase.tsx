@@ -46,7 +46,7 @@ export function NeetiHeroShowcase() {
             {/* CTAs */}
             <div className="pt-2 flex flex-wrap items-center gap-3">
               <Link href="/dashboard" className="btn-primary-green px-6 py-3 text-sm shadow-xs">
-                <span>Get Started</span>
+                <span>Get started</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
               
@@ -71,8 +71,8 @@ export function NeetiHeroShowcase() {
 
         {/* Bottom Giant Display Typography (Matching Flim Display Banner) */}
         <div className="w-full text-center overflow-hidden pt-4 pb-2 border-t border-[#dfdfdf]/60">
-          <h2 className="text-[15vw] sm:text-[14vw] lg:text-[160px] font-extrabold tracking-[-0.05em] text-[#171717] leading-[0.82] uppercase select-none font-sans">
-            Neeti Vivaad
+          <h2 className="text-[14vw] sm:text-[13vw] lg:text-[140px] font-extrabold tracking-[-0.05em] text-[#171717] leading-[0.82] uppercase select-none font-sans">
+            Neeti Saarthi
           </h2>
         </div>
 

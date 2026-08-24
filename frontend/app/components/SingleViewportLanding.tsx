@@ -76,7 +76,7 @@ export function SingleViewportLanding() {
             </nav>
 
             {/* Dark Sign-in Pill */}
-            <Link href="/debate" className="vp-sign-in-btn">Sign in</Link>
+            <Link href="/dashboard" className="vp-sign-in-btn">Get started</Link>
           </div>
 
           {/* Mobile Circular Burger Button */}

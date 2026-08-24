@@ -17,6 +17,7 @@ __pycache__/
 backend/db.sqlite3
 backend/media/
 .env
+backend/.env
 *.env.local
 
 # IDE & OS files

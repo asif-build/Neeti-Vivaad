@@ -10,6 +10,7 @@ urlpatterns = [
     path('api/assessment/', include('assessment.urls')),
     path('api/debate/', include('debate.urls')),
     path('api/dashboard/', include('dashboard.urls')),
+    path('api/admin/', include('dashboard.admin_urls')),
 ]
 
 if settings.DEBUG:
