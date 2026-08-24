@@ -1,336 +1,385 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Upload, FileText, CheckCircle2, XCircle, Sparkles, BookOpen, AlertCircle, ArrowRight, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import {
+  AlertCircle,
+  BookOpen,
+  CheckCircle2,
+  FileText,
+  Sparkles,
+  Upload,
+  XCircle,
+} from 'lucide-react';
+
+type QuizOption = {
+  id: number;
+  text: string;
+};
+
+type QuizQuestion = {
+  id: number;
+  question: string;
+  source_citation: string;
+  options: QuizOption[];
+};
+
+type Quiz = {
+  quiz_id: number;
+  quiz_title: string;
+  questions: QuizQuestion[];
+};
+
+type ResultItem = {
+  question_id: number;
+  correct_option_id: number;
+  user_option_id: number;
+  is_correct: boolean;
+  source_citation: string;
+  explanation: string;
+};
+
+type QuizResult = {
+  score_percentage: number;
+  correct_answers: number;
+  total_questions: number;
+  competency_score_delta: number;
+  detailed_results: ResultItem[];
+};
+
+async function readApiResponse<T>(response: Response): Promise<T> {
+  const payload = (await response.json().catch(() => ({}))) as T & { error?: string };
+  if (!response.ok) {
+    throw new Error(payload.error || `Request failed with status ${response.status}.`);
+  }
+  return payload;
+}
 
 export default function QuizStudio() {
-  const [documentTitle, setDocumentTitle] = useState('MoSPI India Data Quality Framework (IDQF) 2024 Guidelines');
-  const [documentText, setDocumentText] = useState(`India Data Quality Framework (IDQF) 2024 Standards.
-Ministry of Statistics and Programme Implementation (MoSPI).
-
-Section 1. Core Principles:
-All national sample statistical collections must maintain a minimum confidence interval of 95%. Automated anomaly detection must flag duplicate household records within 24 hours of submission.
-
-Section 2. Privacy & Masking:
-Microdata dissemination must undergo k-anonymity (k>=5) and differential privacy noise addition before public release. Personally Identifiable Information (PII) including Aadhaar numbers and biometric tokens must be stripped at the field collection tablet level.
-
-Section 3. Enumerator Compliance:
-Enumerators operating in LWE (Left-Wing Extremism) affected or hilly terrains must be provided offline-first mobile survey tools. Multi-tier verification shouldn't exceed 15 minutes per household to maintain public cooperation and response rates.`);
-
-  const [documentId, setDocumentId] = useState<number | null>(1);
-  const [quiz, setQuiz] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [documentTitle, setDocumentTitle] = useState('');
+  const [documentText, setDocumentText] = useState('');
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [questionCount, setQuestionCount] = useState(4);
+  const [documentId, setDocumentId] = useState<number | null>(null);
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
-  const [quizResult, setQuizResult] = useState<any>(null);
+  const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const fallbackQuestions = {
-    quiz_id: 1,
-    quiz_title: 'Grounded Assessment: IDQF 2024 Guidelines',
-    questions: [
-      {
-        id: 1,
-        question: 'What is the mandatory minimum confidence interval required for all national sample statistical collections under IDQF 2024?',
-        source_citation: 'Section 1: All national sample statistical collections must maintain a minimum confidence interval of 95%.',
-        options: [
-          { id: 1, text: '90%' },
-          { id: 2, text: '95%' },
-          { id: 3, text: '99%' },
-          { id: 4, text: '100%' }
-        ]
-      },
-      {
-        id: 2,
-        question: 'According to Section 2, what level of k-anonymity must microdata undergo before public dissemination?',
-        source_citation: 'Section 2: Microdata dissemination must undergo k-anonymity (k>=5).',
-        options: [
-          { id: 5, text: 'k>=2' },
-          { id: 6, text: 'k>=5' },
-          { id: 7, text: 'k>=10' },
-          { id: 8, text: 'No anonymity required' }
-        ]
-      }
-    ]
+  const generateQuiz = async (docId: number) => {
+    const response = await fetch('/api/assessment/generate-quiz/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        document_id: docId,
+        num_questions: questionCount,
+      }),
+    });
+    const generatedQuiz = await readApiResponse<Quiz>(response);
+    setQuiz(generatedQuiz);
+    setQuizResult(null);
+    setUserAnswers({});
   };
 
   const handleUpload = async () => {
-    setLoading(true);
-    try {
-      let res = await fetch('/api/assessment/upload/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: documentTitle, text: documentText })
-      }).catch(() => null);
-
-      if (!res || !res.ok) {
-        res = await fetch('http://127.0.0.1:8000/api/assessment/upload/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: documentTitle, text: documentText })
-        }).catch(() => null);
-      }
-
-      if (res && res.ok) {
-        const d = await res.json();
-        setDocumentId(d.document_id || 1);
-        generateQuiz(d.document_id || 1);
-      } else {
-        setQuiz(fallbackQuestions);
-        setLoading(false);
-      }
-    } catch {
-      setQuiz(fallbackQuestions);
-      setLoading(false);
+    if (!documentFile && documentText.trim().length < 200) {
+      setError('Paste at least 200 characters or upload a supported document.');
+      return;
     }
-  };
 
-  const generateQuiz = async (docId: number) => {
     setLoading(true);
+    setError('');
+    setQuiz(null);
     setQuizResult(null);
-    setUserAnswers({});
+
     try {
-      let res = await fetch('/api/assessment/generate-quiz/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ document_id: docId })
-      }).catch(() => null);
-
-      if (!res || !res.ok) {
-        res = await fetch('http://127.0.0.1:8000/api/assessment/generate-quiz/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ document_id: docId })
-        }).catch(() => null);
-      }
-
-      if (res && res.ok) {
-        const d = await res.json();
-        setQuiz(d);
+      const body = new FormData();
+      if (documentTitle.trim()) body.append('title', documentTitle.trim());
+      if (documentFile) {
+        body.append('file', documentFile);
       } else {
-        setQuiz(fallbackQuestions);
+        body.append('text', documentText.trim());
       }
-    } catch {
-      setQuiz(fallbackQuestions);
+
+      const uploadResponse = await fetch('/api/assessment/upload/', {
+        method: 'POST',
+        body,
+      });
+      const uploaded = await readApiResponse<{ document_id: number }>(uploadResponse);
+      setDocumentId(uploaded.document_id);
+      await generateQuiz(uploaded.document_id);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Quiz generation failed.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOptionSelect = (questionId: number, optionId: number) => {
-    if (quizResult) return;
-    setUserAnswers(prev => ({ ...prev, [questionId]: optionId }));
-  };
-
   const handleSubmitQuiz = async () => {
     if (!quiz) return;
+    if (Object.keys(userAnswers).length !== quiz.questions.length) {
+      setError('Answer every question before submitting.');
+      return;
+    }
+
     setSubmitting(true);
+    setError('');
     try {
-      let res = await fetch('/api/assessment/submit-quiz/', {
+      const response = await fetch('/api/assessment/submit-quiz/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           quiz_id: quiz.quiz_id,
-          answers: userAnswers
-        })
-      }).catch(() => null);
-
-      if (!res || !res.ok) {
-        res = await fetch('http://127.0.0.1:8000/api/assessment/submit-quiz/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            quiz_id: quiz.quiz_id,
-            answers: userAnswers
-          })
-        }).catch(() => null);
-      }
-
-      if (res && res.ok) {
-        const d = await res.json();
-        setQuizResult(d);
-      } else {
-        // Evaluate locally
-        const correctCount = (userAnswers[1] === 2 ? 1 : 0) + (userAnswers[2] === 6 ? 1 : 0);
-        const score = Math.round((correctCount / 2) * 100);
-        setQuizResult({
-          score_percentage: score,
-          detailed_results: [
-            { question_id: 1, correct_option_id: 2, is_correct: userAnswers[1] === 2, explanation: 'Section 1 explicitly mandates a 95% confidence interval for national statistical sampling.' },
-            { question_id: 2, correct_option_id: 6, is_correct: userAnswers[2] === 6, explanation: 'Section 2 specifies that k must be greater than or equal to 5 (k>=5) before public release.' }
-          ]
-        });
-      }
-    } catch {
-      setQuizResult({
-        score_percentage: 100,
-        detailed_results: [
-          { question_id: 1, correct_option_id: 2, is_correct: true, explanation: 'Section 1 explicitly mandates a 95% confidence interval for national statistical sampling.' },
-          { question_id: 2, correct_option_id: 6, is_correct: true, explanation: 'Section 2 specifies that k must be greater than or equal to 5 (k>=5) before public release.' }
-        ]
+          answers: userAnswers,
+        }),
       });
+      setQuizResult(await readApiResponse<QuizResult>(response));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Quiz submission failed.');
     } finally {
       setSubmitting(false);
     }
   };
 
+  const regenerateQuiz = async () => {
+    if (!documentId) return;
+    setLoading(true);
+    setError('');
+    try {
+      await generateQuiz(documentId);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Quiz generation failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white text-[#171717] py-10 px-4 sm:px-6 lg:px-8 max-w-[1280px] mx-auto space-y-8 font-sans">
-      
-      {/* Header */}
       <div className="card-supa-light p-6 space-y-3 shadow-sm">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="pill-tag-emerald">
-            <Sparkles className="w-3.5 h-3.5" /> Strictly Grounded AI Quiz Generator
+            <Sparkles className="w-3.5 h-3.5" /> Source-grounded AI quiz generator
           </span>
-          <span className="text-xs font-mono text-[#707070]">Zero AI Hallucination Guarantee</span>
+          <span className="text-xs font-mono text-[#707070]">
+            AI citations are checked against the uploaded source before questions are saved.
+          </span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-medium tracking-tight text-[#171717]">
+        <h1 className="text-2xl sm:text-3xl font-medium tracking-tight">
           AI Assessment &amp; Document Quiz Studio
         </h1>
-        <p className="text-xs text-[#707070] leading-relaxed max-w-3xl font-normal">
-          Upload any MoSPI guideline document, SOP, or policy PDF. Questions are generated strictly from the uploaded source text with verified page citations.
+        <p className="text-xs text-[#707070] leading-relaxed max-w-3xl">
+          Upload a PDF, TXT, Markdown, or CSV document—or paste source text—and generate a fresh
+          assessment from its actual contents.
         </p>
       </div>
 
+      {error && (
+        <div className="rounded-[8px] border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div>
+            <strong className="block">Could not complete the request</strong>
+            <span>{error}</span>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Document Uploader & Text Input (5 cols) */}
-        <div className="lg:col-span-5 card-supa-light p-6 space-y-4 shadow-sm">
+        <div className="lg:col-span-5 card-supa-light p-6 space-y-5 shadow-sm">
           <div className="flex items-center justify-between border-b border-[#ededed] pb-3">
-            <h2 className="text-sm font-semibold text-[#171717] flex items-center gap-2">
-              <FileText className="w-4 h-4 text-[#24b47e]" /> Reference Document Input
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[#24b47e]" /> Source document
             </h2>
-            <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-[#fafafa] border border-[#dfdfdf] text-[#707070]">
-              MoSPI IDQF
+            <span className="text-[10px] font-mono uppercase text-[#707070]">10 MB maximum</span>
+          </div>
+
+          <div>
+            <label className="text-xs font-mono text-[#707070] block mb-1">Document title</label>
+            <input
+              type="text"
+              value={documentTitle}
+              onChange={(event) => setDocumentTitle(event.target.value)}
+              placeholder="Optional—uses the filename when omitted"
+              className="w-full bg-white border border-[#dfdfdf] rounded-[6px] px-3 py-2 text-xs focus:outline-none focus:border-[#171717]"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-mono text-[#707070] block mb-1">
+              Upload PDF, TXT, MD, or CSV
+            </label>
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-[6px] border border-dashed border-[#c9c9c9] bg-[#fafafa] px-4 py-5 text-xs text-[#575757] hover:border-[#24b47e]">
+              <Upload className="w-4 h-4" />
+              <span>{documentFile ? documentFile.name : 'Choose a document'}</span>
+              <input
+                type="file"
+                accept=".pdf,.txt,.md,.csv,application/pdf,text/plain,text/markdown,text/csv"
+                className="sr-only"
+                onChange={(event) => {
+                  setDocumentFile(event.target.files?.[0] ?? null);
+                  setDocumentText('');
+                  setError('');
+                }}
+              />
+            </label>
+            {documentFile && (
+              <div className="mt-2 flex items-center justify-between gap-3 text-[11px]">
+                <span className="flex items-center gap-1.5 text-emerald-700">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  PDF selected and ready to process
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDocumentFile(null)}
+                  className="text-rose-700 underline"
+                >
+                  Remove file
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-[#9a9a9a]">
+            <span className="h-px flex-1 bg-[#ededed]" /> or <span className="h-px flex-1 bg-[#ededed]" />
+          </div>
+
+          <div>
+            <label className="text-xs font-mono text-[#707070] block mb-1">Paste source text</label>
+            <textarea
+              rows={10}
+              value={documentText}
+              disabled={Boolean(documentFile)}
+              onChange={(event) => setDocumentText(event.target.value)}
+              placeholder="Paste at least 200 characters from the source document…"
+              className="w-full bg-[#fafafa] border border-[#dfdfdf] rounded-[6px] p-3 text-xs font-mono focus:outline-none focus:border-[#171717] leading-relaxed disabled:opacity-50"
+            />
+            <span className="text-[10px] font-mono text-[#9a9a9a]">
+              {documentText.trim().length.toLocaleString()} characters
             </span>
           </div>
 
           <div>
-            <label className="text-xs font-mono text-[#707070] block mb-1">Document Title</label>
-            <input
-              type="text"
-              value={documentTitle}
-              onChange={(e) => setDocumentTitle(e.target.value)}
-              className="w-full bg-white border border-[#dfdfdf] rounded-[6px] px-3 py-2 text-xs font-mono text-[#171717] focus:outline-none focus:border-[#171717]"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-mono text-[#707070] block mb-1">Document Text / Guideline Content</label>
-            <textarea
-              rows={12}
-              value={documentText}
-              onChange={(e) => setDocumentText(e.target.value)}
-              className="w-full bg-[#fafafa] border border-[#dfdfdf] rounded-[6px] p-3 text-xs font-mono text-[#171717] focus:outline-none focus:border-[#171717] leading-relaxed"
-            />
+            <label className="text-xs font-mono text-[#707070] block mb-1">Number of questions</label>
+            <select
+              value={questionCount}
+              onChange={(event) => setQuestionCount(Number(event.target.value))}
+              className="w-full bg-white border border-[#dfdfdf] rounded-[6px] px-3 py-2 text-xs"
+            >
+              {[2, 3, 4, 5, 6, 8, 10].map((count) => (
+                <option key={count} value={count}>{count}</option>
+              ))}
+            </select>
           </div>
 
           <button
             onClick={handleUpload}
             disabled={loading}
-            className="btn-primary-green w-full py-2.5 text-xs flex items-center justify-center gap-2"
+            className="btn-primary-green w-full py-2.5 text-xs flex items-center justify-center gap-2 disabled:opacity-60"
           >
-            {loading ? (
-              <span>Generating Grounded MCQs...</span>
-            ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Parse Document &amp; Generate Quiz</span>
-              </>
-            )}
+            <Sparkles className="w-3.5 h-3.5" />
+            {loading ? 'Reading source and generating questions…' : 'Generate quiz from source'}
           </button>
-
-          <p className="text-[11px] font-mono text-[#707070] text-center">
-            Non-negotiable rule: No outside facts are used to formulate questions.
-          </p>
         </div>
 
-        {/* Interactive Quiz Area (7 cols) */}
         <div className="lg:col-span-7 card-supa-light p-6 space-y-6 shadow-sm">
           <div className="flex items-center justify-between border-b border-[#ededed] pb-4">
             <div>
-              <h2 className="text-sm font-semibold text-[#171717] flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-[#24b47e]" /> Grounded Assessment Questions
+              <h2 className="text-sm font-semibold flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-[#24b47e]" /> Assessment
               </h2>
-              {quiz && <p className="text-xs font-mono text-[#24b47e] mt-0.5">{quiz.quiz_title}</p>}
+              {quiz && <p className="text-xs font-mono text-[#24b47e] mt-1">{quiz.quiz_title}</p>}
             </div>
             {quizResult && (
               <span className="px-3 py-1 rounded-full text-xs font-mono bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold">
-                Score: {quizResult.score_percentage}%
+                {quizResult.correct_answers}/{quizResult.total_questions} · {quizResult.score_percentage}%
               </span>
             )}
           </div>
 
           {!quiz && !loading && (
             <div className="text-center py-16 text-[#707070] text-xs font-mono space-y-3">
-              <AlertCircle className="w-8 h-8 text-[#9a9a9a] mx-auto" />
-              <p>Click "Parse Document &amp; Generate Quiz" to generate grounded questions from text.</p>
+              {documentFile || documentText.trim().length >= 200 ? (
+                <>
+                  <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
+                  <p className="text-emerald-800">
+                    Source selected. Click “Generate quiz from source” to continue.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-8 h-8 text-[#9a9a9a] mx-auto" />
+                  <p>Choose a source document to generate an assessment.</p>
+                </>
+              )}
             </div>
           )}
 
           {loading && (
             <div className="text-center py-20 text-[#24b47e] font-mono text-xs">
-              Analyzing document text and synthesizing grounded questions with citations...
+              Extracting text, generating questions, and verifying citations…
             </div>
           )}
 
           {quiz && !loading && (
             <div className="space-y-6">
-              {quiz.questions.map((q: any, idx: number) => {
-                const resultItem = quizResult?.detailed_results?.find((r: any) => r.question_id === q.id);
+              {quiz.questions.map((question, index) => {
+                const result = quizResult?.detailed_results.find(
+                  (item) => item.question_id === question.id,
+                );
                 return (
-                  <div key={q.id} className="p-4 rounded-[8px] bg-[#fafafa] border border-[#ededed] space-y-3">
+                  <div key={question.id} className="p-4 rounded-[8px] bg-[#fafafa] border border-[#ededed] space-y-3">
                     <div className="flex items-start gap-3">
                       <span className="px-2 py-0.5 rounded bg-[#171717] text-white text-xs font-mono font-bold shrink-0">
-                        Q{idx + 1}
+                        Q{index + 1}
                       </span>
-                      <h3 className="font-semibold text-[#171717] text-sm leading-snug">{q.question}</h3>
+                      <h3 className="font-semibold text-sm leading-snug">{question.question}</h3>
                     </div>
 
-                    {/* Source Citation Badge */}
                     <div className="p-2.5 rounded-[6px] bg-emerald-50/70 border border-emerald-200 text-[11px] font-mono text-emerald-950">
-                      📌 <strong className="text-emerald-900">Document Citation:</strong> {q.source_citation}
+                      <strong>Verified source excerpt:</strong> “{question.source_citation}”
                     </div>
 
-                    {/* Options */}
                     <div className="space-y-2 pt-1">
-                      {q.options.map((opt: any) => {
-                        const isSelected = userAnswers[q.id] === opt.id;
-                        let optionClass = 'bg-white border-[#dfdfdf] text-[#171717] hover:border-[#171717]';
-
-                        if (quizResult && resultItem) {
-                          if (opt.id === resultItem.correct_option_id) {
+                      {question.options.map((option) => {
+                        const selected = userAnswers[question.id] === option.id;
+                        let optionClass = 'bg-white border-[#dfdfdf] hover:border-[#171717]';
+                        if (quizResult && result) {
+                          if (option.id === result.correct_option_id) {
                             optionClass = 'bg-emerald-100 border-emerald-500 text-emerald-950 font-bold';
-                          } else if (isSelected && !resultItem.is_correct) {
+                          } else if (selected && !result.is_correct) {
                             optionClass = 'bg-rose-50 border-rose-400 text-rose-950 font-bold';
                           }
-                        } else if (isSelected) {
-                          optionClass = 'bg-emerald-50 border-emerald-600 text-emerald-950 font-medium ring-1 ring-emerald-500';
+                        } else if (selected) {
+                          optionClass = 'bg-emerald-50 border-emerald-600 text-emerald-950 ring-1 ring-emerald-500';
                         }
 
                         return (
                           <button
-                            key={opt.id}
-                            onClick={() => handleOptionSelect(q.id, opt.id)}
-                            className={`w-full p-2.5 rounded-[6px] text-left text-xs font-sans transition-all border flex items-center justify-between ${optionClass}`}
+                            key={option.id}
+                            type="button"
+                            disabled={Boolean(quizResult)}
+                            onClick={() =>
+                              setUserAnswers((answers) => ({ ...answers, [question.id]: option.id }))
+                            }
+                            className={`w-full p-2.5 rounded-[6px] text-left text-xs transition-all border flex items-center justify-between disabled:cursor-default ${optionClass}`}
                           >
-                            <span>{opt.text}</span>
-                            {quizResult && opt.id === resultItem?.correct_option_id && (
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <span>{option.text}</span>
+                            {quizResult && option.id === result?.correct_option_id && (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                             )}
-                            {quizResult && isSelected && !resultItem?.is_correct && (
-                              <XCircle className="w-4 h-4 text-rose-600" />
+                            {quizResult && selected && !result?.is_correct && (
+                              <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
                             )}
                           </button>
                         );
                       })}
                     </div>
 
-                    {/* Explanation after submission */}
-                    {quizResult && resultItem && (
-                      <div className="mt-3 p-3 rounded-[6px] bg-white border border-[#dfdfdf] text-xs font-sans text-[#707070] leading-relaxed">
-                        <strong className="text-emerald-700 font-mono block mb-1">Source Grounded Explanation:</strong>
-                        {resultItem.explanation}
+                    {result && (
+                      <div className="p-3 rounded-[6px] bg-white border border-[#dfdfdf] text-xs text-[#707070] leading-relaxed">
+                        <strong className="text-emerald-700 font-mono block mb-1">Explanation</strong>
+                        {result.explanation}
                       </div>
                     )}
                   </div>
@@ -341,27 +390,26 @@ Enumerators operating in LWE (Left-Wing Extremism) affected or hilly terrains mu
                 <button
                   onClick={handleSubmitQuiz}
                   disabled={submitting}
-                  className="btn-primary-green w-full py-2.5 text-xs font-semibold"
+                  className="btn-primary-green w-full py-2.5 text-xs font-semibold disabled:opacity-60"
                 >
-                  {submitting ? 'Evaluating Answers...' : 'Submit Assessment & Update Profile Score'}
+                  {submitting ? 'Evaluating answers…' : 'Submit assessment'}
                 </button>
               ) : (
                 <div className="p-3.5 rounded-[6px] bg-emerald-50 border border-emerald-200 text-xs font-mono text-emerald-950 flex flex-col sm:flex-row items-center justify-between gap-3">
-                  <span>✓ Quiz evaluation complete! Competency score updated in official profile.</span>
+                  <span>Assessment saved successfully.</span>
                   <button
-                    onClick={() => generateQuiz(documentId || 1)}
-                    className="px-3 py-1.5 rounded-[4px] bg-[#171717] text-white text-xs font-medium hover:bg-[#3ecf8e] hover:text-[#171717] transition-colors shrink-0"
+                    type="button"
+                    onClick={regenerateQuiz}
+                    className="px-3 py-1.5 rounded-[4px] bg-[#171717] text-white text-xs font-medium"
                   >
-                    Retake / New Questions
+                    Generate new questions
                   </button>
                 </div>
               )}
             </div>
           )}
         </div>
-
       </div>
-
     </div>
   );
 }

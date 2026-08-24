@@ -3,10 +3,10 @@ from pathlib import Path
 from datetime import timedelta
 import dotenv
 
-# Load environment variables
-dotenv.load_dotenv()
-
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Always load the backend's local environment file, regardless of launch directory.
+dotenv.load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-neeti-vivaad-sih2026-mospi-secret-key-key-12345')
 
@@ -141,4 +141,9 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+NVIDIA_API_KEY = os.getenv('NVIDIA_API_KEY', '')
+NVIDIA_API_BASE_URL = os.getenv('NVIDIA_API_BASE_URL', 'https://integrate.api.nvidia.com/v1')
+NVIDIA_NEMOTRON_MODEL = os.getenv(
+    'NVIDIA_NEMOTRON_MODEL',
+    'nvidia/nemotron-3-super-120b-a12b',
+)
