@@ -36,9 +36,9 @@ def main():
         exists = cur.fetchone()
         if not exists:
             cur.execute(f"CREATE DATABASE {args.dbname};")
-            print(f"✅ Successfully created PostgreSQL database '{args.dbname}'.")
+            print(f"[OK] Successfully created PostgreSQL database '{args.dbname}'.")
         else:
-            print(f"ℹ️ PostgreSQL database '{args.dbname}' already exists.")
+            print(f"[INFO] PostgreSQL database '{args.dbname}' already exists.")
         cur.close()
         conn.close()
 
@@ -54,14 +54,14 @@ DEBUG=True
 """
         with open('.env', 'w') as f:
             f.write(env_content)
-        print("✅ Updated .env file with PostgreSQL connection parameters.")
+        print("[OK] Updated .env file with PostgreSQL connection parameters.")
 
         # Run migrations
         print("Running Django migrations on PostgreSQL...")
         os.system('python manage.py migrate')
         print("Seeding initial data...")
         os.system('python seed_data.py')
-        print("🎉 PostgreSQL setup and data seeding complete!")
+        print("[DONE] PostgreSQL setup and data seeding complete!")
 
     except psycopg2.OperationalError as e:
         print(f"❌ Failed to connect to PostgreSQL: {e}")
