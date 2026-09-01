@@ -4,144 +4,78 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Welcome to Neethi Sarthi — Verify Your Account</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: #f4f4f5;
-      margin: 0;
-      padding: 0;
-      color: #18181b;
-    }
-    .container {
-      max-width: 600px;
-      margin: 30px auto;
-      background-color: #ffffff;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid #e4e4e7;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-    }
-    .header {
-      background-color: #09090b;
-      padding: 32px;
-      text-align: center;
-      border-bottom: 3px solid #10b981;
-    }
-    .logo-text {
-      color: #ffffff;
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      margin: 0;
-    }
-    .tagline {
-      color: #10b981;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-top: 4px;
-      font-weight: 600;
-    }
-    .content {
-      padding: 36px 32px;
-      line-height: 1.6;
-      font-size: 14px;
-      color: #27272a;
-    }
-    h2 {
-      font-size: 18px;
-      font-weight: 700;
-      color: #09090b;
-      margin-top: 0;
-    }
-    p {
-      margin: 0 0 16px 0;
-    }
-    .highlight-box {
-      background-color: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      border-radius: 12px;
-      padding: 16px 20px;
-      margin: 20px 0;
-      font-size: 13px;
-      color: #166534;
-    }
-    .btn-container {
-      text-align: center;
-      margin: 32px 0;
-    }
-    .btn {
-      display: inline-block;
-      background-color: #10b981;
-      color: #09090b !important;
-      font-weight: 700;
-      font-size: 14px;
-      padding: 14px 32px;
-      border-radius: 10px;
-      text-decoration: none;
-      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
-    }
-    .btn:hover {
-      background-color: #059669;
-    }
-    .url-fallback {
-      font-size: 11px;
-      color: #71717a;
-      word-break: break-all;
-      background-color: #fafafa;
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid #e4e4e7;
-      margin-top: 24px;
-    }
-    .footer {
-      background-color: #fafafa;
-      padding: 24px 32px;
-      text-align: center;
-      font-size: 12px;
-      color: #71717a;
-      border-top: 1px solid #e4e4e7;
-    }
-  </style>
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1 class="logo-text">Neethi Sarthi</h1>
-      <div class="tagline">Skill Intelligence &amp; Policy Decision Engine</div>
-    </div>
-    <div class="content">
-      <h2>Hello {{ first_name }},</h2>
-      <p>Welcome to <strong>Neethi Sarthi</strong>. Your official account has been created successfully.</p>
-      
-      <div class="highlight-box">
-        Neethi Sarthi helps you understand your professional competencies, identify critical skill gaps, discover personalized iGOT learning opportunities, and strengthen policy decision-making through AI-moderated <em>Neeti Vivaad</em> debate simulations.
-      </div>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 20px 0; color: #18181b;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e4e4e7; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #09090b; padding: 32px 24px; text-align: center; border-bottom: 3px solid #10b981;">
+              <h1 style="color: #ffffff; font-size: 24px; font-weight: 800; margin: 0; letter-spacing: -0.5px;">Neethi Sarthi</h1>
+              <div style="color: #10b981; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 6px; font-weight: 600;">
+                Skill Intelligence &amp; Policy Decision Engine
+              </div>
+            </td>
+          </tr>
 
-      <p>Please verify your email address to activate your account and begin your personalized baseline assessment:</p>
+          <!-- Content Body -->
+          <tr>
+            <td style="padding: 36px 32px; line-height: 1.6; font-size: 15px; color: #27272a;">
+              <h2 style="font-size: 18px; font-weight: 700; color: #09090b; margin-top: 0; margin-bottom: 16px;">Hello {{ first_name }},</h2>
+              
+              <p style="margin: 0 0 16px 0;">Welcome to <strong>Neethi Sarthi</strong>. Your account has been created successfully.</p>
+              
+              <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px 20px; margin: 20px 0; font-size: 13.5px; color: #166534; line-height: 1.5;">
+                Neethi Sarthi helps officials understand their professional competencies, identify skill gaps, discover personalized learning opportunities, and strengthen decision-making.
+              </div>
 
-      <div class="btn-container">
-        <a href="{{ verification_url }}" class="btn">VERIFY MY EMAIL</a>
-      </div>
+              <p style="margin: 0 0 24px 0;">Please verify your email address to activate your account:</p>
 
-      <p style="font-size: 12px; color: #71717a;">
-        ⏱ <strong>Security Notice:</strong> This verification link is valid for <strong>{{ expiry_hours }} hours</strong> and can only be used once. If you did not create this account, please disregard this email.
-      </p>
+              <!-- Centered Verification Button -->
+              <table role="presentation" border="0" cellspacing="0" cellpadding="0" style="margin: 28px auto; text-align: center;">
+                <tr>
+                  <td align="center" style="border-radius: 8px; background-color: #10b981;">
+                    <a href="{{ verification_url }}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       style="display: inline-block; padding: 14px 36px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 700; color: #09090b; text-decoration: none; border-radius: 8px; border: 1px solid #10b981; text-transform: uppercase; letter-spacing: 0.5px;">
+                      VERIFY MY EMAIL
+                    </a>
+                  </td>
+                </tr>
+              </table>
 
-      <div class="url-fallback">
-        If the button above does not work, copy and paste this secure URL into your browser:<br>
-        <a href="{{ verification_url }}" style="color: #059669;">{{ verification_url }}</a>
-      </div>
+              <p style="font-size: 12px; color: #71717a; margin-top: 24px; margin-bottom: 16px;">
+                ⏱ <strong>Security Notice:</strong> This verification link expires after {{ expiry_hours }} hours and is single-use.
+              </p>
 
-      <p style="margin-top: 24px; margin-bottom: 0;">
-        Regards,<br>
-        <strong>Team Neethi Sarthi</strong><br>
-        <span style="font-size: 12px; color: #71717a;">Ministry of Statistics and Programme Implementation (MoSPI)</span>
-      </p>
-    </div>
-    <div class="footer">
-      &copy; 2026 Neethi Sarthi &bull; Built for India's Official Statistical System (MoSPI SIH26101)
-    </div>
-  </div>
+              <!-- Fallback plain URL -->
+              <div style="font-size: 12px; color: #71717a; background-color: #fafafa; padding: 14px; border-radius: 8px; border: 1px solid #e4e4e7; word-break: break-all;">
+                If the button above does not work, copy and paste this link into your browser:<br>
+                <a href="{{ verification_url }}" target="_blank" rel="noopener noreferrer" style="color: #059669; word-break: break-all; font-weight: 500;">{{ verification_url }}</a>
+              </div>
+
+              <p style="margin-top: 28px; margin-bottom: 0;">
+                Regards,<br>
+                <strong>Team Neethi Sarthi</strong><br>
+                <span style="font-size: 12px; color: #71717a;">Ministry of Statistics and Programme Implementation (MoSPI)</span>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #fafafa; padding: 20px 32px; text-align: center; font-size: 12px; color: #71717a; border-top: 1px solid #e4e4e7;">
+              &copy; 2026 Neethi Sarthi &bull; Built for India's Official Statistical System
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>

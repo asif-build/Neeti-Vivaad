@@ -16,6 +16,10 @@ class EmailService:
 
     @classmethod
     def get_frontend_base_url(cls, request=None):
+        import os
+        frontend_url = os.getenv('FRONTEND_URL') or getattr(settings, 'FRONTEND_URL', None)
+        if frontend_url:
+            return frontend_url.rstrip('/')
         if request:
             origin = request.headers.get('origin') or request.headers.get('Origin')
             if origin:
@@ -26,8 +30,6 @@ class EmailService:
                 p = urlparse(referer)
                 if p.scheme and p.netloc:
                     return f"{p.scheme}://{p.netloc}"
-        if hasattr(settings, 'FRONTEND_URL') and settings.FRONTEND_URL:
-            return settings.FRONTEND_URL.rstrip('/')
         return 'http://localhost:3000'
 
     @classmethod
