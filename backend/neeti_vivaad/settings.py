@@ -3,10 +3,12 @@ from pathlib import Path
 from datetime import timedelta
 import dotenv
 
-# Load environment variables
-dotenv.load_dotenv()
-
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables
+dotenv.load_dotenv(BASE_DIR / '.env')
+dotenv.load_dotenv(BASE_DIR.parent / '.env')
+dotenv.load_dotenv()
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-neeti-vivaad-sih2026-mospi-secret-key-key-12345')
 
@@ -128,13 +130,13 @@ SIMPLE_JWT = {
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 
-# Email Lifecycle Configuration (Resend SMTP supported)
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend' if (os.getenv('EMAIL_HOST_PASSWORD') or os.getenv('RESEND_API_KEY')) else 'django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.resend.com')
+# Email Lifecycle Configuration (Gmail SMTP)
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend' if os.getenv('EMAIL_HOST_PASSWORD') else 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'resend')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', os.getenv('RESEND_API_KEY', ''))
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'neetisaarthi@gmail.com')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 't')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Neethi Sarthi <onboarding@resend.dev>')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Neethi Sarthi <neetisaarthi@gmail.com>')
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 SEND_POST_VERIFICATION_EMAIL = os.getenv('SEND_POST_VERIFICATION_EMAIL', 'True').lower() in ('true', '1', 't')

@@ -62,7 +62,7 @@ class EmailService:
         if not getattr(settings, 'SEND_POST_VERIFICATION_EMAIL', True):
             return True, None
 
-        subject = "Your Neethi Sarthi Account Is Ready 🎉"
+        subject = "Your Neethi Sarthi Account Is Verified"
         email_type = 'ACCOUNT_VERIFIED'
 
         frontend_url = cls.get_frontend_base_url(request)
