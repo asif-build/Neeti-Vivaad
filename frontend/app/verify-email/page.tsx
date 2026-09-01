@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { VivaadTreeLogo } from '../components/Logo';
@@ -16,6 +16,7 @@ function VerifyEmailContent() {
   const [success, setSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [userData, setUserData] = useState<any>(null);
+  const hasExecutedRef = useRef(false);
 
   useEffect(() => {
     if (!token) {
@@ -24,21 +25,25 @@ function VerifyEmailContent() {
       return;
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
+    if (hasExecutedRef.current) return;
+    hasExecutedRef.current = true;
 
     const performVerification = async () => {
       try {
         const base = getApiBaseUrl();
+        console.log('[VerifyEmail] Initiating verification against:', `${base}/api/auth/verify-email/`);
+        
         const res = await fetch(`${base}/api/auth/verify-email/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-          signal: controller.signal
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ token })
         });
 
-        clearTimeout(timeoutId);
-        const data = await res.json();
+        const data = await res.json().catch(() => ({ error: 'Invalid response from verification server.' }));
+        console.log('[VerifyEmail] Response status:', res.status, 'Body:', data);
         
         if (!res.ok) {
           throw new Error(data.error || 'Email verification failed or token has expired.');
@@ -56,22 +61,14 @@ function VerifyEmailContent() {
         }
         window.dispatchEvent(new Event('roleChange'));
       } catch (err: any) {
-        if (err.name === 'AbortError') {
-          setErrorMessage('Verification request timed out. Please check your network connection.');
-        } else {
-          setErrorMessage(err.message || 'Verification link is invalid or has already been used.');
-        }
+        console.error('[VerifyEmail] Verification error:', err);
+        setErrorMessage(err.message || 'Verification link is invalid or has already been used.');
       } finally {
         setLoading(false);
       }
     };
 
     performVerification();
-
-    return () => {
-      clearTimeout(timeoutId);
-      controller.abort();
-    };
   }, [token]);
 
   return (

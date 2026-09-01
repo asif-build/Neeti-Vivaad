@@ -2,7 +2,7 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     const protocol = window.location.protocol;
-    if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    if (hostname) {
       return `${protocol}//${hostname}:8000`;
     }
   }
