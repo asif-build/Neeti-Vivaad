@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { VivaadTreeLogo } from '../components/Logo';
 import { Lock, Mail, Building, User, ArrowRight, Briefcase, KeyRound, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { setTokens, setSavedUser } from '../utils/api';
+import { setTokens, setSavedUser, getApiBaseUrl } from '../utils/api';
 
 function LoginContent() {
   const router = useRouter();
@@ -33,8 +33,9 @@ function LoginContent() {
     setUnverifiedEmail(null);
 
     try {
+      const base = getApiBaseUrl();
       if (mode === 'signin') {
-        const res = await fetch('http://127.0.0.1:8000/api/auth/login/', {
+        const res = await fetch(`${base}/api/auth/login/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
@@ -66,7 +67,7 @@ function LoginContent() {
         }
       } else {
         // Sign Up / Register
-        const res = await fetch('http://127.0.0.1:8000/api/auth/register/', {
+        const res = await fetch(`${base}/api/auth/register/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -16,12 +16,18 @@ class EmailService:
 
     @classmethod
     def get_frontend_base_url(cls, request=None):
-        if hasattr(settings, 'FRONTEND_URL') and settings.FRONTEND_URL:
-            return settings.FRONTEND_URL.rstrip('/')
         if request:
-            origin = request.headers.get('origin') or request.headers.get('referer')
+            origin = request.headers.get('origin') or request.headers.get('Origin')
             if origin:
                 return origin.rstrip('/')
+            referer = request.headers.get('referer') or request.headers.get('Referer')
+            if referer:
+                from urllib.parse import urlparse
+                p = urlparse(referer)
+                if p.scheme and p.netloc:
+                    return f"{p.scheme}://{p.netloc}"
+        if hasattr(settings, 'FRONTEND_URL') and settings.FRONTEND_URL:
+            return settings.FRONTEND_URL.rstrip('/')
         return 'http://localhost:3000'
 
     @classmethod

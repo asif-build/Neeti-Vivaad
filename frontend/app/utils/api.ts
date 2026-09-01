@@ -1,3 +1,14 @@
+export function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      return `${protocol}//${hostname}:8000`;
+    }
+  }
+  return process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
+}
+
 export const API_BASE = 'http://127.0.0.1:8000';
 
 export function getAccessToken(): string | null {
@@ -42,7 +53,8 @@ export function setSavedUser(user: any) {
 }
 
 export async function authFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  const base = getApiBaseUrl();
+  const url = endpoint.startsWith('http') ? endpoint : `${base}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
   const token = getAccessToken();
 
   const headers = new Headers(options.headers || {});

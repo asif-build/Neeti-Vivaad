@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { VivaadTreeLogo } from '../components/Logo';
 import { Lock, Mail, Building, User, ArrowRight, Phone, Briefcase, GraduationCap } from 'lucide-react';
-import { authFetch, setTokens, setSavedUser } from '../utils/api';
+import { authFetch, setTokens, setSavedUser, getApiBaseUrl } from '../utils/api';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -32,7 +32,8 @@ export default function RegisterPage() {
     const skillsArray = skills ? skills.split(',').map(s => s.trim()).filter(Boolean) : [];
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/auth/register/', {
+      const base = getApiBaseUrl();
+      const res = await fetch(`${base}/api/auth/register/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

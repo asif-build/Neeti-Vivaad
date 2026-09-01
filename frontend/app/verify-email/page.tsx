@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { VivaadTreeLogo } from '../components/Logo';
 import { CheckCircle2, XCircle, ArrowRight, Sparkles, ShieldCheck, Loader2 } from 'lucide-react';
-import { setTokens, setSavedUser } from '../utils/api';
+import { setTokens, setSavedUser, getApiBaseUrl } from '../utils/api';
 
 function VerifyEmailContent() {
   const router = useRouter();
@@ -26,7 +26,8 @@ function VerifyEmailContent() {
 
     const performVerification = async () => {
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/auth/verify-email/', {
+        const base = getApiBaseUrl();
+        const res = await fetch(`${base}/api/auth/verify-email/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token })

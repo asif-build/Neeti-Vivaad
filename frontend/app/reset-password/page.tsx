@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { VivaadTreeLogo } from '../components/Logo';
 import { Lock, CheckCircle2, ArrowRight, KeyRound, AlertCircle } from 'lucide-react';
+import { getApiBaseUrl } from '../utils/api';
 
 function ResetPasswordContent() {
   const router = useRouter();
@@ -32,7 +33,8 @@ function ResetPasswordContent() {
     setError(null);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/auth/password-reset/confirm/', {
+      const base = getApiBaseUrl();
+      const res = await fetch(`${base}/api/auth/password-reset/confirm/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password })

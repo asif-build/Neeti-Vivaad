@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { VivaadTreeLogo } from '../components/Logo';
 import { Mail, CheckCircle2, ArrowRight, ArrowLeft, KeyRound } from 'lucide-react';
+import { getApiBaseUrl } from '../utils/api';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -17,7 +18,8 @@ export default function ForgotPasswordPage() {
     setError(null);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/auth/password-reset/request/', {
+      const base = getApiBaseUrl();
+      const res = await fetch(`${base}/api/auth/password-reset/request/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })

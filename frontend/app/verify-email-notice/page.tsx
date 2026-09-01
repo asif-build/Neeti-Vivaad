@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { VivaadTreeLogo } from '../components/Logo';
 import { Mail, CheckCircle2, RefreshCw, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { getApiBaseUrl } from '../utils/api';
 
 function VerifyEmailNoticeContent() {
   const searchParams = useSearchParams();
@@ -28,7 +29,8 @@ function VerifyEmailNoticeContent() {
     setResendStatus(null);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/auth/resend-verification/', {
+      const base = getApiBaseUrl();
+      const res = await fetch(`${base}/api/auth/resend-verification/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
