@@ -8,8 +8,8 @@ import { Logo } from './Logo';
 export function Footer() {
   const pathname = usePathname();
 
-  // Hide site-wide footer on /login page
-  if (pathname === '/login') return null;
+  // Hide site-wide footer on auth/registration/onboarding pages
+  if (pathname === '/login' || pathname === '/register' || pathname === '/candidate/onboarding') return null;
 
   return (
     <footer className="border-t border-[#ededed] bg-white py-16 text-[#707070] text-xs font-sans">
