@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { VivaadTreeLogo } from '../components/Logo';
-import { CheckCircle2, XCircle, ArrowRight, Sparkles, ShieldCheck, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowRight, ShieldCheck, Loader2 } from 'lucide-react';
 import { setTokens, setSavedUser, getApiBaseUrl } from '../utils/api';
 
 function VerifyEmailContent() {
@@ -24,14 +24,20 @@ function VerifyEmailContent() {
       return;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
+
     const performVerification = async () => {
       try {
         const base = getApiBaseUrl();
         const res = await fetch(`${base}/api/auth/verify-email/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token })
+          body: JSON.stringify({ token }),
+          signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
         const data = await res.json();
         
         if (!res.ok) {
@@ -41,7 +47,7 @@ function VerifyEmailContent() {
         setSuccess(true);
         setUserData(data.user);
 
-        // Store tokens if returned
+        // Store tokens
         if (data.access && data.refresh) {
           setTokens(data.access, data.refresh);
         }
@@ -50,13 +56,22 @@ function VerifyEmailContent() {
         }
         window.dispatchEvent(new Event('roleChange'));
       } catch (err: any) {
-        setErrorMessage(err.message || 'Verification token invalid or expired.');
+        if (err.name === 'AbortError') {
+          setErrorMessage('Verification request timed out. Please check your network connection.');
+        } else {
+          setErrorMessage(err.message || 'Verification link is invalid or has already been used.');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     performVerification();
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [token]);
 
   return (
@@ -118,16 +133,16 @@ function VerifyEmailContent() {
               </div>
 
               <div className="space-y-2">
-                <h1 className="text-xl font-bold text-rose-950">Verification Link Invalid or Expired</h1>
-                <p className="text-xs text-rose-700 font-mono">
+                <h1 className="text-xl font-bold text-rose-950">Verification Failed</h1>
+                <p className="text-xs text-rose-700 font-medium">
                   {errorMessage}
                 </p>
               </div>
 
               <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-left text-xs text-amber-900 space-y-1">
-                <strong className="block font-semibold">What can you do?</strong>
+                <strong className="block font-semibold">Security Notice:</strong>
                 <p className="text-[11px] text-amber-800">
-                  Verification tokens expire in 24 hours and can only be used once. You can request a fresh verification link or sign in if already verified.
+                  Verification links are valid for 24 hours and strictly single-use. If this link has already been used, you can sign in directly.
                 </p>
               </div>
 
