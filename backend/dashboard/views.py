@@ -75,7 +75,7 @@ class AdminDashboardView(APIView):
 
         heatmap_data = []
         for dept in departments:
-            dept_users = User.objects.filter(department__icontains=dept)
+            dept_users = User.objects.filter(official_profile__department__icontains=dept)
             dept_users_count = dept_users.count()
             if dept_users_count > 0:
                 profs = OfficialSkillProficiency.objects.filter(user__in=dept_users)

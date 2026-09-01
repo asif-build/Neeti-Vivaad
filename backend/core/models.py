@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
@@ -14,6 +15,16 @@ class CompetencyDomainType(models.TextChoices):
 class User(AbstractUser):
     role = models.CharField(max_length=20, choices=UserRole.choices, default=UserRole.OFFICIAL)
     mobile_number = models.CharField(max_length=20, blank=True, null=True)
+    is_email_verified = models.BooleanField(default=False)
+    profile_complete = models.BooleanField(default=False)
+    baseline_completed = models.BooleanField(default=False)
+    ctq_score = models.FloatField(default=0.0, help_text="Critical Thinking & Decision-Making Quotient")
+
+    def __str__(self):
+        return f"{self.get_full_name() or self.username} ({self.email})"
+
+class OfficialProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='official_profile')
     organisation = models.CharField(max_length=200, default='Government of India', blank=True)
     department = models.CharField(max_length=200, default='', blank=True)
     designation = models.CharField(max_length=200, default='Statistical Officer', blank=True)
@@ -22,12 +33,21 @@ class User(AbstractUser):
     skills = models.JSONField(default=list, blank=True)
     training_history = models.TextField(blank=True, default='')
     learning_preferences = models.JSONField(default=dict, blank=True)
-    profile_complete = models.BooleanField(default=False)
-    baseline_completed = models.BooleanField(default=False)
-    ctq_score = models.FloatField(default=0.0, help_text="Critical Thinking & Decision-Making Quotient")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.get_full_name() or self.username} ({self.designation or 'Official'})"
+        return f"OfficialProfile: {self.user.username} - {self.designation} ({self.department})"
+
+class EmailVerificationToken(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='verification_tokens')
+    token = models.CharField(max_length=64, unique=True, default=uuid.uuid4)
+    is_verified = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Token for {self.user.email} (Verified: {self.is_verified})"
 
 class CompetencyDomain(models.Model):
     name = models.CharField(max_length=100)
