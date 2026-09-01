@@ -1,8 +1,11 @@
 Hello {{ first_name }},
 
-Your Neethi Sarthi account has been successfully verified.
+Your email has been verified successfully.
 
-The next step is to complete your professional profile so we can build your personalized competency baseline:
+Your Neethi Sarthi account is now active.
+
+Next step:
+Complete your professional profile so we can understand your role, experience, skills and learning goals:
 {{ onboarding_url }}
 
 Regards,

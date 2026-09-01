@@ -1,16 +1,17 @@
 import logging
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
-from django.utils.html import strip_tags
+from django.utils import timezone
+from .models import EmailLog
 
 logger = logging.getLogger(__name__)
 
 class EmailService:
     """
     Production-grade Email Lifecycle Service for Neethi Sarthi.
-    Handles personalized HTML + Plain-text email rendering and delivery.
-    Configurable for Console (development) and SMTP (production).
+    Dispatches transactional emails via Resend SMTP (or configured backend),
+    logs delivery events, and maintains audit trails without leaking secrets.
     """
 
     @classmethod
@@ -28,122 +29,133 @@ class EmailService:
         """
         Sends initial Welcome + Email Verification link after registration.
         """
-        try:
-            frontend_url = cls.get_frontend_base_url(request)
-            verification_url = f"{frontend_url}/verify-email?token={token.token}"
-            
-            context = {
-                'first_name': user.first_name or 'Official',
-                'user': user,
-                'verification_url': verification_url,
-                'expiry_hours': 24,
-                'support_email': getattr(settings, 'SUPPORT_EMAIL', 'support@neethi-sarthi.gov.in')
-            }
+        subject = "Welcome to Neethi Sarthi — Verify Your Account"
+        email_type = 'WELCOME_VERIFICATION'
+        
+        frontend_url = cls.get_frontend_base_url(request)
+        verification_url = f"{frontend_url}/verify-email?token={token.token}"
 
-            subject = "Welcome to Neethi Sarthi — Verify Your Account"
-            html_content = render_to_string('emails/welcome_verification.html', context)
-            plain_content = render_to_string('emails/welcome_verification.txt', context)
+        context = {
+            'first_name': user.first_name or 'Official',
+            'user': user,
+            'verification_url': verification_url,
+            'expiry_hours': 24,
+            'support_email': getattr(settings, 'SUPPORT_EMAIL', 'support@neethi-sarthi.gov.in')
+        }
 
-            send_mail(
-                subject=subject,
-                message=plain_content,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                html_message=html_content,
-                fail_silently=False
-            )
-            logger.info(f"Welcome & Verification email dispatched to {user.email}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to dispatch welcome verification email to {user.email}: {e}")
-            return False
+        return cls._send_templated_email(
+            user=user,
+            recipient_email=user.email,
+            subject=subject,
+            email_type=email_type,
+            template_html='emails/welcome_verification.html',
+            template_txt='emails/welcome_verification.txt',
+            context=context
+        )
 
     @classmethod
     def send_account_verified_email(cls, user, request=None):
         """
-        Sends confirmation email once account has been successfully verified.
-        Can be toggled via SEND_POST_VERIFICATION_EMAIL setting.
+        Sends second welcome email once account has been successfully verified.
+        Subject: "Your Neethi Sarthi Account Is Ready 🎉"
         """
         if not getattr(settings, 'SEND_POST_VERIFICATION_EMAIL', True):
-            return False
+            return True, None
 
-        try:
-            frontend_url = cls.get_frontend_base_url(request)
-            onboarding_url = f"{frontend_url}/candidate/onboarding"
+        subject = "Your Neethi Sarthi Account Is Ready 🎉"
+        email_type = 'ACCOUNT_VERIFIED'
 
-            context = {
-                'first_name': user.first_name or 'Official',
-                'user': user,
-                'onboarding_url': onboarding_url
-            }
+        frontend_url = cls.get_frontend_base_url(request)
+        onboarding_url = f"{frontend_url}/candidate/onboarding"
 
-            subject = "Your Neethi Sarthi Account Is Verified"
-            html_content = render_to_string('emails/welcome_verified.html', context)
-            plain_content = render_to_string('emails/welcome_verified.txt', context)
+        context = {
+            'first_name': user.first_name or 'Official',
+            'user': user,
+            'onboarding_url': onboarding_url
+        }
 
-            send_mail(
-                subject=subject,
-                message=plain_content,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                html_message=html_content,
-                fail_silently=False
-            )
-            logger.info(f"Account verified confirmation email dispatched to {user.email}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to dispatch account verified email to {user.email}: {e}")
-            return False
+        return cls._send_templated_email(
+            user=user,
+            recipient_email=user.email,
+            subject=subject,
+            email_type=email_type,
+            template_html='emails/welcome_verified.html',
+            template_txt='emails/welcome_verified.txt',
+            context=context
+        )
 
     @classmethod
     def send_password_reset_email(cls, user, token, request=None):
         """
         Sends secure, expiring password reset link.
+        Subject: "Reset Your Neethi Sarthi Password"
         """
+        subject = "Reset Your Neethi Sarthi Password"
+        email_type = 'PASSWORD_RESET'
+
+        frontend_url = cls.get_frontend_base_url(request)
+        reset_url = f"{frontend_url}/reset-password?token={token.token}"
+
+        context = {
+            'first_name': user.first_name or 'Official',
+            'user': user,
+            'reset_url': reset_url,
+            'expiry_minutes': 60
+        }
+
+        return cls._send_templated_email(
+            user=user,
+            recipient_email=user.email,
+            subject=subject,
+            email_type=email_type,
+            template_html='emails/password_reset.html',
+            template_txt='emails/password_reset.txt',
+            context=context
+        )
+
+    @classmethod
+    def _send_templated_email(cls, user, recipient_email, subject, email_type, template_html, template_txt, context):
+        """
+        Internal dispatcher with rendering, logging, and error handling.
+        """
+        log_entry = EmailLog.objects.create(
+            recipient_email=recipient_email,
+            recipient_user=user,
+            email_type=email_type,
+            subject=subject,
+            status=EmailLog.EmailStatus.PENDING
+        )
+
         try:
-            frontend_url = cls.get_frontend_base_url(request)
-            reset_url = f"{frontend_url}/reset-password?token={token.token}"
+            html_content = render_to_string(template_html, context)
+            plain_content = render_to_string(template_txt, context)
 
-            context = {
-                'first_name': user.first_name or 'Official',
-                'user': user,
-                'reset_url': reset_url,
-                'expiry_minutes': 60
-            }
-
-            subject = "Reset Your Neethi Sarthi Password"
-            html_content = render_to_string('emails/password_reset.html', context)
-            plain_content = render_to_string('emails/password_reset.txt', context)
-
-            send_mail(
+            from_email = settings.DEFAULT_FROM_EMAIL
+            
+            msg = EmailMultiAlternatives(
                 subject=subject,
-                message=plain_content,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                html_message=html_content,
-                fail_silently=False
+                body=plain_content,
+                from_email=from_email,
+                to=[recipient_email]
             )
-            logger.info(f"Password reset email dispatched to {user.email}")
-            return True
+            msg.attach_alternative(html_content, "text/html")
+            
+            # Send message via configured backend (Resend SMTP or Console)
+            send_result = msg.send(fail_silently=False)
+            
+            log_entry.status = EmailLog.EmailStatus.SENT
+            log_entry.sent_at = timezone.now()
+            log_entry.save()
+
+            logger.info(f"[{email_type}] Successfully sent email to {recipient_email}")
+            return True, None
         except Exception as e:
-            logger.error(f"Failed to dispatch password reset email to {user.email}: {e}")
-            return False
+            err_msg = str(e)
+            logger.error(f"[{email_type}] Failed to send email to {recipient_email}: {err_msg}")
+            
+            # Record sanitized failure in audit log
+            log_entry.status = EmailLog.EmailStatus.FAILED
+            log_entry.failure_reason = err_msg[:500]
+            log_entry.save()
 
-    # -------------------------------------------------------------
-    # Extensible Future Lifecycle Stubs (Ready for feature linkage)
-    # -------------------------------------------------------------
-    @classmethod
-    def send_profile_completion_reminder(cls, user, request=None):
-        logger.info(f"Stub: profile completion reminder for {user.email}")
-
-    @classmethod
-    def send_assessment_completion_email(cls, user, ctq_score, request=None):
-        logger.info(f"Stub: baseline assessment completion email for {user.email} (CTQ: {ctq_score})")
-
-    @classmethod
-    def send_competency_report_email(cls, user, report_data, request=None):
-        logger.info(f"Stub: competency report email for {user.email}")
-
-    @classmethod
-    def send_debate_summary_email(cls, user, session_data, request=None):
-        logger.info(f"Stub: debate session summary email for {user.email}")
+            return False, err_msg

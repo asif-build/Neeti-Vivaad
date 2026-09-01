@@ -129,3 +129,22 @@ class RoleCompetencyRequirement(models.Model):
 
     def __str__(self):
         return f"{self.designation} requirement for {self.subskill.name}: {self.target_score}"
+
+class EmailLog(models.Model):
+    class EmailStatus(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        SENT = 'SENT', 'Sent'
+        FAILED = 'FAILED', 'Failed'
+
+    recipient_email = models.EmailField(max_length=255)
+    recipient_user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='email_logs')
+    email_type = models.CharField(max_length=50) # WELCOME_VERIFICATION, ACCOUNT_VERIFIED, PASSWORD_RESET
+    subject = models.CharField(max_length=255)
+    provider_message_id = models.CharField(max_length=255, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=EmailStatus.choices, default=EmailStatus.PENDING)
+    failure_reason = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"[{self.status}] {self.email_type} to {self.recipient_email} at {self.created_at}"
