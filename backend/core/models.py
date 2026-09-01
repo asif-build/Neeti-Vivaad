@@ -31,6 +31,36 @@ class User(AbstractUser):
     baseline_completed = models.BooleanField(default=False)
     ctq_score = models.FloatField(default=0.0, help_text="Critical Thinking & Decision-Making Quotient")
 
+    @property
+    def designation(self):
+        profile = getattr(self, 'official_profile', None)
+        return profile.designation if profile else 'Statistical Officer'
+
+    @property
+    def department(self):
+        profile = getattr(self, 'official_profile', None)
+        return profile.department if profile else ''
+
+    @property
+    def organisation(self):
+        profile = getattr(self, 'official_profile', None)
+        return profile.organisation if profile else 'Government of India'
+
+    @property
+    def experience_years(self):
+        profile = getattr(self, 'official_profile', None)
+        return profile.experience_years if profile else 0.0
+
+    @property
+    def education(self):
+        profile = getattr(self, 'official_profile', None)
+        return profile.education if profile else ''
+
+    @property
+    def skills(self):
+        profile = getattr(self, 'official_profile', None)
+        return profile.skills if profile else []
+
     def __str__(self):
         return f"{self.get_full_name() or self.username} ({self.email}) - {self.status}"
 

@@ -25,28 +25,38 @@ export default function LearnerDashboard() {
       return;
     }
 
-    authFetch('/api/dashboard/learner/')
-      .then(async res => {
-        if (res.status === 401 || res.status === 403) {
-          router.push('/login');
-          return;
-        }
-        if (!res.ok) {
-          throw new Error('Failed to fetch dashboard data.');
-        }
-        return res.json();
-      })
-      .then(d => {
-        if (d) {
-          setData(d);
-        }
-      })
-      .catch(err => {
-        setError(err.message || 'Error loading dashboard.');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    const fetchDashboard = () => {
+      setLoading(true);
+      setError(null);
+      authFetch('/api/dashboard/learner/')
+        .then(async res => {
+          if (res.status === 401 || res.status === 403) {
+            router.push('/login');
+            return;
+          }
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            const msg = errData.error || errData.message || `Server responded with ${res.status}: ${res.statusText}`;
+            console.error(`[Dashboard API Error] Status: ${res.status}, Endpoint: /api/dashboard/learner/, Message:`, msg);
+            throw new Error(msg);
+          }
+          return res.json();
+        })
+        .then(d => {
+          if (d) {
+            setData(d);
+          }
+        })
+        .catch(err => {
+          console.error('[Dashboard Error]:', err);
+          setError(err.message || 'Error loading dashboard.');
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    };
+
+    fetchDashboard();
   }, [router]);
 
   if (loading) {
@@ -61,9 +71,14 @@ export default function LearnerDashboard() {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center text-[#171717] font-sans p-6 space-y-4">
         <div className="text-sm font-medium text-rose-600">{error || 'Unable to load profile data.'}</div>
-        <Link href="/login" className="btn-primary-green px-4 py-2 text-xs">
-          Sign In Again
-        </Link>
+        <div className="flex gap-3">
+          <button onClick={() => window.location.reload()} className="px-4 py-2 border border-[#dfdfdf] rounded text-xs hover:border-[#171717]">
+            Retry
+          </button>
+          <Link href="/login" className="btn-primary-green px-4 py-2 text-xs">
+            Sign In Again
+          </Link>
+        </div>
       </div>
     );
   }
