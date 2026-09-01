@@ -50,7 +50,7 @@ ROOT_URLCONF = 'neeti_vivaad.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -127,3 +127,14 @@ SIMPLE_JWT = {
 }
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+
+# Email Lifecycle Configuration (Console backend for dev, SMTP configurable for prod)
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 't')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Neethi Sarthi <no-reply@neethi-sarthi.gov.in>')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+SEND_POST_VERIFICATION_EMAIL = os.getenv('SEND_POST_VERIFICATION_EMAIL', 'True').lower() in ('true', '1', 't')

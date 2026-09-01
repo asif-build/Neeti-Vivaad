@@ -56,12 +56,8 @@ export default function RegisterPage() {
         throw new Error(errMsg);
       }
 
-      setTokens(data.access, data.refresh);
-      setSavedUser(data.user);
-      window.dispatchEvent(new Event('roleChange'));
-
-      // Redirect to Onboarding / Baseline Assessment
-      router.push('/candidate/onboarding');
+      // Redirect to Email Verification Notice
+      router.push(`/verify-email-notice?email=${encodeURIComponent(email)}`);
     } catch (err: any) {
       setError(err.message || 'An error occurred during registration.');
     } finally {

@@ -1,0 +1,18 @@
+Hello {{ first_name }},
+
+Welcome to Neethi Sarthi.
+
+Your account has been created successfully.
+
+Neethi Sarthi helps you understand your professional competencies, identify skill gaps, discover personalized learning opportunities, and strengthen decision-making through Neeti Vivaad.
+
+Please verify your email address to activate your account:
+{{ verification_url }}
+
+This link is valid for {{ expiry_hours }} hours and can only be used once.
+
+After verification, you can complete your professional profile and begin your competency assessment.
+
+Regards,
+Team Neethi Sarthi
+Ministry of Statistics and Programme Implementation (MoSPI)

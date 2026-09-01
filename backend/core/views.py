@@ -1,18 +1,21 @@
+from datetime import timedelta
+from django.utils import timezone
+from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken, OutstandingToken, BlacklistedToken
-from django.utils import timezone
-from django.db.models import Q
+from rest_framework_simplejwt.tokens import RefreshToken
+
 from .models import (
-    User, OfficialProfile, EmailVerificationToken,
+    User, UserStatus, OfficialProfile, EmailVerificationToken, PasswordResetToken,
     CompetencyDomain, SubSkill, OfficialSkillProficiency, RoleCompetencyRequirement
 )
 from .serializers import (
     UserSerializer, RegisterSerializer, OfficialProfileSerializer,
     OfficialSkillProficiencySerializer, CompetencyDomainSerializer
 )
+from .email_service import EmailService
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
@@ -21,14 +24,27 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            refresh = RefreshToken.for_user(user)
-            token_obj = EmailVerificationToken.objects.filter(user=user).last()
             
+            # User starts with PENDING_VERIFICATION
+            user.status = UserStatus.PENDING_VERIFICATION
+            user.is_email_verified = False
+            user.save()
+
+            # Create fresh secure verification token (expires in 24 hours)
+            token_obj = EmailVerificationToken.objects.create(
+                user=user,
+                expires_at=timezone.now() + timedelta(hours=24)
+            )
+            
+            # Dispatch personalized Welcome + Verification email
+            EmailService.send_welcome_verification_email(user, token_obj, request)
+
             return Response({
-                'message': 'Account registered successfully. Please verify your official email.',
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-                'verification_token': str(token_obj.token) if token_obj else None,
+                'message': 'Account created successfully. A verification link has been dispatched to your official email.',
+                'email': user.email,
+                'status': user.status,
+                'is_email_verified': False,
+                'verification_token': str(token_obj.token),
                 'user': UserSerializer(user).data
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -38,29 +54,151 @@ class VerifyEmailView(APIView):
 
     def post(self, request):
         token_str = request.data.get('token')
-        email = request.data.get('email')
+        if not token_str:
+            return Response({'error': 'Verification token is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        token_obj = None
-        if token_str:
-            token_obj = EmailVerificationToken.objects.filter(token=token_str).first()
-        elif email:
-            token_obj = EmailVerificationToken.objects.filter(user__email__iexact=email).last()
-
+        token_obj = EmailVerificationToken.objects.filter(token=token_str, is_used=False).first()
         if not token_obj:
-            return Response({'error': 'Invalid or expired verification token.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Invalid, already used, or non-existent verification token.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        token_obj.is_verified = True
+        if token_obj.is_expired:
+            return Response({'error': 'This verification token has expired. Please request a new verification email.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Mark token as single-use completed
+        token_obj.is_used = True
         token_obj.verified_at = timezone.now()
         token_obj.save()
 
+        # Update User status to ACTIVE
         user = token_obj.user
         user.is_email_verified = True
+        user.status = UserStatus.ACTIVE
         user.save()
 
+        # Optionally send post-verification welcome
+        EmailService.send_account_verified_email(user, request)
+
+        # Issue JWT credentials immediately for smooth onboarding
+        refresh = RefreshToken.for_user(user)
         return Response({
-            'message': f'Email {user.email} verified successfully.',
+            'message': 'Your email has been verified and your account is now active!',
             'is_email_verified': True,
+            'status': user.status,
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
             'user': UserSerializer(user).data
+        }, status=status.HTTP_200_OK)
+
+class ResendVerificationEmailView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email', '').strip().lower()
+        if not email:
+            return Response({'error': 'Email address is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            # Mask user existence
+            return Response({'message': 'If an unverified account exists with that email, a new verification link has been dispatched.'})
+
+        if user.is_email_verified or user.status == UserStatus.ACTIVE:
+            return Response({'message': 'This account has already been verified. You can log in directly.', 'already_verified': True})
+
+        # Rate limiting: max 1 request every 60 seconds
+        recent_token = EmailVerificationToken.objects.filter(
+            user=user,
+            created_at__gte=timezone.now() - timedelta(seconds=60)
+        ).first()
+        if recent_token:
+            return Response(
+                {'error': 'A verification email was recently dispatched. Please wait at least 60 seconds before requesting another.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        # Invalidate old unused tokens and issue a fresh one
+        EmailVerificationToken.objects.filter(user=user, is_used=False).update(is_used=True)
+        new_token = EmailVerificationToken.objects.create(
+            user=user,
+            expires_at=timezone.now() + timedelta(hours=24)
+        )
+
+        EmailService.send_welcome_verification_email(user, new_token, request)
+
+        return Response({
+            'message': 'A fresh verification email has been dispatched to your address.',
+            'verification_token': str(new_token.token)
+        })
+
+class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email', '').strip().lower()
+        if not email:
+            return Response({'error': 'Email address is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.filter(email__iexact=email).first()
+        if user:
+            # Rate limiting: check recent requests
+            recent_request = PasswordResetToken.objects.filter(
+                user=user,
+                created_at__gte=timezone.now() - timedelta(seconds=60)
+            ).first()
+            if recent_request:
+                return Response(
+                    {'error': 'A password reset email was recently dispatched. Please wait 60 seconds before requesting another.'},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+
+            # Invalidate old unused reset tokens
+            PasswordResetToken.objects.filter(user=user, is_used=False).update(is_used=True)
+
+            reset_token = PasswordResetToken.objects.create(
+                user=user,
+                expires_at=timezone.now() + timedelta(hours=1)
+            )
+            EmailService.send_password_reset_email(user, reset_token, request)
+
+        # Generic safe response to prevent email harvesting
+        return Response({
+            'message': 'If an account exists with that email address, password reset instructions have been sent.'
+        })
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        token_str = request.data.get('token')
+        new_password = request.data.get('password')
+
+        if not token_str or not new_password:
+            return Response({'error': 'Token and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(new_password) < 6:
+            return Response({'error': 'Password must be at least 6 characters long.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        token_obj = PasswordResetToken.objects.filter(token=token_str, is_used=False).first()
+        if not token_obj:
+            return Response({'error': 'Invalid, expired, or already used password reset link.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if token_obj.is_expired:
+            return Response({'error': 'This password reset link has expired. Please request a new one.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = token_obj.user
+        user.set_password(new_password)
+        user.save()
+
+        # Mark token used
+        token_obj.is_used = True
+        token_obj.used_at = timezone.now()
+        token_obj.save()
+
+        # Invalidate any other active reset tokens for this user
+        PasswordResetToken.objects.filter(user=user, is_used=False).update(is_used=True)
+
+        return Response({
+            'message': 'Password has been reset successfully. You can now log in with your new password.'
         })
 
 class LoginView(APIView):
@@ -73,10 +211,13 @@ class LoginView(APIView):
         if not identifier or not password:
             return Response({'error': 'Please provide both email/username and password.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Lookup user in database
         user = User.objects.filter(Q(email__iexact=identifier) | Q(username__iexact=identifier)).first()
         if not user or not user.check_password(password):
             return Response({'error': 'Invalid credentials. Please verify your email and password.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Check account status
+        if user.status == UserStatus.SUSPENDED:
+            return Response({'error': 'This official account has been suspended. Please contact your system administrator.'}, status=status.HTTP_403_FORBIDDEN)
 
         # Ensure OfficialProfile exists
         OfficialProfile.objects.get_or_create(
@@ -89,6 +230,8 @@ class LoginView(APIView):
             'message': 'Login successful',
             'refresh': str(refresh),
             'access': str(refresh.access_token),
+            'status': user.status,
+            'is_email_verified': user.is_email_verified,
             'user': UserSerializer(user).data
         })
 
@@ -146,7 +289,9 @@ class ProfileView(APIView):
             'proficiencies': OfficialSkillProficiencySerializer(proficiencies, many=True).data,
             'domain_scores': domain_scores,
             'profile_complete': user.profile_complete,
-            'baseline_completed': user.baseline_completed
+            'baseline_completed': user.baseline_completed,
+            'status': user.status,
+            'is_email_verified': user.is_email_verified
         })
 
     def patch(self, request):

@@ -1,10 +1,20 @@
-import uuid
+import secrets
+from datetime import timedelta
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
+
+def generate_secure_token():
+    return secrets.token_urlsafe(32)
 
 class UserRole(models.TextChoices):
     OFFICIAL = 'OFFICIAL', 'Government Official'
     ADMIN = 'ADMIN', 'System Administrator / DG'
+
+class UserStatus(models.TextChoices):
+    PENDING_VERIFICATION = 'PENDING_VERIFICATION', 'Pending Verification'
+    ACTIVE = 'ACTIVE', 'Active'
+    SUSPENDED = 'SUSPENDED', 'Suspended'
 
 class CompetencyDomainType(models.TextChoices):
     STATISTICAL = 'STATISTICAL', 'Statistical'
@@ -14,6 +24,7 @@ class CompetencyDomainType(models.TextChoices):
 
 class User(AbstractUser):
     role = models.CharField(max_length=20, choices=UserRole.choices, default=UserRole.OFFICIAL)
+    status = models.CharField(max_length=30, choices=UserStatus.choices, default=UserStatus.PENDING_VERIFICATION)
     mobile_number = models.CharField(max_length=20, blank=True, null=True)
     is_email_verified = models.BooleanField(default=False)
     profile_complete = models.BooleanField(default=False)
@@ -21,7 +32,7 @@ class User(AbstractUser):
     ctq_score = models.FloatField(default=0.0, help_text="Critical Thinking & Decision-Making Quotient")
 
     def __str__(self):
-        return f"{self.get_full_name() or self.username} ({self.email})"
+        return f"{self.get_full_name() or self.username} ({self.email}) - {self.status}"
 
 class OfficialProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='official_profile')
@@ -41,13 +52,43 @@ class OfficialProfile(models.Model):
 
 class EmailVerificationToken(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='verification_tokens')
-    token = models.CharField(max_length=64, unique=True, default=uuid.uuid4)
-    is_verified = models.BooleanField(default=False)
+    token = models.CharField(max_length=100, unique=True, default=generate_secure_token)
     created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
     verified_at = models.DateTimeField(null=True, blank=True)
 
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(hours=24)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
     def __str__(self):
-        return f"Token for {self.user.email} (Verified: {self.is_verified})"
+        return f"VerificationToken for {self.user.email} (Used: {self.is_used})"
+
+class PasswordResetToken(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_reset_tokens')
+    token = models.CharField(max_length=100, unique=True, default=generate_secure_token)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(hours=1)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    def __str__(self):
+        return f"ResetToken for {self.user.email} (Used: {self.is_used})"
 
 class CompetencyDomain(models.Model):
     name = models.CharField(max_length=100)

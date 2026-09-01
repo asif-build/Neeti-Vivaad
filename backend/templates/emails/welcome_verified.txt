@@ -1,0 +1,10 @@
+Hello {{ first_name }},
+
+Your Neethi Sarthi account has been successfully verified.
+
+The next step is to complete your professional profile so we can build your personalized competency baseline:
+{{ onboarding_url }}
+
+Regards,
+Team Neethi Sarthi
+Ministry of Statistics and Programme Implementation (MoSPI)

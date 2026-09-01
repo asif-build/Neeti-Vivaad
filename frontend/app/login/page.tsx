@@ -1,17 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { VivaadTreeLogo } from '../components/Logo';
-import { Lock, Mail, Building, User, ArrowRight, Briefcase, Phone } from 'lucide-react';
+import { Lock, Mail, Building, User, ArrowRight, Briefcase, KeyRound, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { setTokens, setSavedUser } from '../utils/api';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const resetSuccess = searchParams.get('reset') === 'success';
+
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
 
   // Form State
   const [email, setEmail] = useState('');
@@ -26,6 +30,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setUnverifiedEmail(null);
 
     try {
       if (mode === 'signin') {
@@ -40,9 +45,16 @@ export default function LoginPage() {
           throw new Error(data.error || 'Invalid credentials. Please verify your email and password.');
         }
 
+        // Store tokens
         setTokens(data.access, data.refresh);
         setSavedUser(data.user);
         window.dispatchEvent(new Event('roleChange'));
+
+        // If email is still unverified, prompt verification notice
+        if (data.user?.status === 'PENDING_VERIFICATION' || !data.user?.is_email_verified) {
+          router.push(`/verify-email-notice?email=${encodeURIComponent(email)}`);
+          return;
+        }
 
         // Route based on profile and baseline completion
         if (!data.user.profile_complete || !data.user.baseline_completed) {
@@ -74,11 +86,8 @@ export default function LoginPage() {
           throw new Error(errMsg);
         }
 
-        setTokens(data.access, data.refresh);
-        setSavedUser(data.user);
-        window.dispatchEvent(new Event('roleChange'));
-
-        router.push('/candidate/onboarding');
+        // Redirect to Email Verification Notice
+        router.push(`/verify-email-notice?email=${encodeURIComponent(email)}`);
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred.');
@@ -124,8 +133,15 @@ export default function LoginPage() {
                 Register Official
               </button>
             </div>
-            <span className="text-xs font-mono text-[#9a9a9a]">Neeti-Vivaad Auth</span>
+            <span className="text-xs font-mono text-[#9a9a9a]">Neethi Sarthi</span>
           </div>
+
+          {resetSuccess && (
+            <div className="p-3.5 rounded-[6px] bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>Password reset successfully. Please sign in with your new password.</span>
+            </div>
+          )}
 
           {error && (
             <div className="p-3.5 rounded-[6px] bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
@@ -216,7 +232,14 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-mono text-[#707070] uppercase font-medium">Password *</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono text-[#707070] uppercase font-medium">Password *</label>
+                {mode === 'signin' && (
+                  <Link href="/forgot-password" className="text-[11px] text-[#707070] hover:text-[#3ecf8e] underline underline-offset-2">
+                    Forgot password?
+                  </Link>
+                )}
+              </div>
               <div className="relative">
                 <Lock className="w-4 h-4 text-[#707070] absolute left-3 top-3" />
                 <input
@@ -235,7 +258,7 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full btn-primary-green py-2.5 text-sm font-medium shadow-xs mt-3 flex items-center justify-center gap-2"
             >
-              <span>{loading ? 'Processing...' : (mode === 'signin' ? 'Sign In to Neeti-Vivaad' : 'Create Official Account')}</span>
+              <span>{loading ? 'Processing...' : (mode === 'signin' ? 'Sign In to Neethi Sarthi' : 'Create Official Account')}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
@@ -246,5 +269,17 @@ export default function LoginPage() {
       </div>
 
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center text-xs font-mono text-[#707070]">
+        Loading sign in...
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }
