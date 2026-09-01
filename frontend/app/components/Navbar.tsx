@@ -4,177 +4,150 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Logo } from './Logo';
-import { UserCheck, Shield, ChevronDown, ArrowRight, LogOut } from 'lucide-react';
+import { UserCheck, Shield, LogOut, LogIn, UserPlus } from 'lucide-react';
+import { getAccessToken, getSavedUser, clearTokens, authFetch } from '../utils/api';
 
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const isHomePage = pathname === '/';
-  const isLoginPage = pathname === '/login';
-
-  const [role, setRole] = useState<'OFFICIAL' | 'ADMIN'>('OFFICIAL');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userName, setUserName] = useState('Rajesh Kumar');
+  const [user, setUser] = useState<any | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const syncAuth = () => {
-    const savedRole = localStorage.getItem('user_role') as 'OFFICIAL' | 'ADMIN';
-    if (savedRole) setRole(savedRole);
-    
-    const savedName = localStorage.getItem('user_name');
-    if (savedName) setUserName(savedName);
-
-    const authStatus = localStorage.getItem('is_authenticated');
-    // On first load or if logged in
-    setIsLoggedIn(authStatus === 'true');
-  };
-
   useEffect(() => {
-    syncAuth();
-    window.addEventListener('storage', syncAuth);
-    window.addEventListener('roleChange', syncAuth);
-    window.addEventListener('authChange', syncAuth);
-    return () => {
-      window.removeEventListener('storage', syncAuth);
-      window.removeEventListener('roleChange', syncAuth);
-      window.removeEventListener('authChange', syncAuth);
+    const checkUser = () => {
+      const token = getAccessToken();
+      if (!token) {
+        setUser(null);
+        return;
+      }
+
+      const saved = getSavedUser();
+      if (saved) setUser(saved);
+
+      // Verify with backend
+      authFetch('/api/auth/me/')
+        .then(res => {
+          if (res.ok) return res.json();
+          throw new Error('Unauthenticated');
+        })
+        .then(data => {
+          if (data && data.user) {
+            setUser(data.user);
+          }
+        })
+        .catch(() => {
+          setUser(null);
+        });
     };
+
+    checkUser();
+    window.addEventListener('roleChange', checkUser);
+    return () => window.removeEventListener('roleChange', checkUser);
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('is_authenticated');
-    setIsLoggedIn(false);
-    window.dispatchEvent(new Event('authChange'));
+    clearTokens();
+    setUser(null);
+    window.dispatchEvent(new Event('roleChange'));
     router.push('/');
   };
 
-  const toggleRole = () => {
-    const next = role === 'OFFICIAL' ? 'ADMIN' : 'OFFICIAL';
-    setRole(next);
-    localStorage.setItem('user_role', next);
-    localStorage.setItem('user_name', next === 'ADMIN' ? 'Dr. A. Sharma' : 'Rajesh Kumar');
-    localStorage.setItem('is_authenticated', 'true');
-    setIsLoggedIn(true);
-    window.dispatchEvent(new Event('roleChange'));
-    window.dispatchEvent(new Event('authChange'));
-    if (next === 'ADMIN') {
-      router.push('/admin-dashboard');
-    } else {
-      router.push('/dashboard');
-    }
-  };
+  // Hide navbar on /login and /register pages
+  if (pathname === '/login' || pathname === '/register') return null;
 
-  const candidateLinks = [
-    { href: '/dashboard', label: 'Candidate Profile' },
+  const navLinks = [
+    { href: '/', label: 'Showcase' },
+    { href: '/dashboard', label: 'Learner Profile' },
     { href: '/courses', label: 'iGOT Courses' },
     { href: '/quiz', label: 'AI Quiz Studio' },
-    { href: '/debate', label: 'Neeti Saarthi Debate' },
+    { href: '/debate', label: 'Neeti Vivaad Studio' },
   ];
 
-  const adminLinks = [
-    { href: '/admin-dashboard', label: 'Admin Heatmap' },
-    { href: '/admin/e-recruitment', label: 'e-Recruitment' },
-    { href: '/admin/workforce-insights', label: 'Workforce Insights' },
-    { href: '/admin/learning-analytics', label: 'Learning Analytics' },
-    { href: '/admin/scenario-manager', label: 'Scenario Manager' },
-  ];
+  if (user && user.role === 'ADMIN') {
+    navLinks.push({ href: '/admin-dashboard', label: 'Admin Heatmap' });
+  }
 
-  if (isLoginPage) return null;
+  const userName = user ? (`${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username) : '';
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-[#ededed]">
-      <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <header className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-[1100px] px-4 font-sans select-none">
+      <div className="bg-black/90 backdrop-blur-xl border border-zinc-800 rounded-full px-5 py-2.5 shadow-2xl flex items-center justify-between text-white">
         
         {/* Left: Brand Logo */}
-        <Link href="/">
-          <Logo size="md" />
+        <Link href="/" className="flex items-center">
+          <Logo size="md" isDark={true} />
         </Link>
 
-        {/* Center Navigation */}
+        {/* Center: Desktop Nav Links */}
         <nav className="hidden lg:flex items-center space-x-1">
-          {/* On Landing / Homepage or when NOT logged in: Show Home, About, Features */}
-          {(isHomePage || !isLoggedIn) ? (
-            <>
+          {navLinks.map((link) => {
+            const isActive = pathname === link.href;
+            return (
               <Link
-                href="/"
-                className={`px-3 py-1.5 rounded-[4px] text-sm transition-colors ${
-                  isHomePage && !pathname.includes('#')
-                    ? 'text-[#171717] font-medium bg-[#fafafa]'
-                    : 'text-[#707070] hover:text-[#171717] hover:bg-[#fafafa]'
+                key={link.href}
+                href={link.href}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  isActive
+                    ? 'text-white font-semibold bg-zinc-800'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
                 }`}
               >
-                Home
+                {link.label}
               </Link>
-              <Link
-                href="/#about"
-                className="px-3 py-1.5 rounded-[4px] text-sm text-[#707070] hover:text-[#171717] hover:bg-[#fafafa] transition-colors"
-              >
-                About
-              </Link>
-              <Link
-                href="/#features"
-                className="px-3 py-1.5 rounded-[4px] text-sm text-[#707070] hover:text-[#171717] hover:bg-[#fafafa] transition-colors"
-              >
-                Features
-              </Link>
-            </>
-          ) : (
-            /* Logged-in State: Show strictly Candidate or Admin links */
-            <>
-              <Link
-                href="/"
-                className="px-3 py-1.5 rounded-[4px] text-sm text-[#707070] hover:text-[#171717] hover:bg-[#fafafa] transition-colors"
-              >
-                Home
-              </Link>
-              {(role === 'ADMIN' ? adminLinks : candidateLinks).map((link) => {
-                const isActive = pathname === link.href;
-                return (
-                  <Link
-                    key={link.href + link.label}
-                    href={link.href}
-                    className={`px-3 py-1.5 rounded-[4px] text-sm transition-colors ${
-                      isActive
-                        ? 'text-[#171717] font-medium bg-[#fafafa]'
-                        : 'text-[#707070] hover:text-[#171717] hover:bg-[#fafafa]'
-                    }`}
-                  >
-                    {link.label}
-                  </Link>
-                );
-              })}
-            </>
-          )}
+            );
+          })}
         </nav>
 
-        {/* Right Section */}
-        <div className="flex items-center gap-3">
-          
-          {/* On Homepage or Not Logged In: Only show the "Get started" button */}
-          {(isHomePage || !isLoggedIn) ? (
-            <Link 
-              href="/login" 
-              className="btn-primary-green text-xs shadow-xs flex items-center gap-1.5 px-4 py-2"
-            >
-              <span>Get started</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+        {/* Right: Action Button */}
+        <div className="flex items-center gap-2">
+          {user ? (
+            <>
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono bg-zinc-900 border border-zinc-800 text-zinc-300">
+                {user.role === 'ADMIN' ? (
+                  <>
+                    <Shield className="w-3.5 h-3.5 text-[#644fc1]" />
+                    <span className="font-semibold text-purple-300">Admin: {userName}</span>
+                  </>
+                ) : (
+                  <>
+                    <UserCheck className="w-3.5 h-3.5 text-[#3ecf8e]" />
+                    <span>{userName}</span>
+                  </>
+                )}
+              </div>
+
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-all shadow-sm"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
+              </button>
+            </>
           ) : (
-            /* Inside Portal: Show Sign Out button */
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] border border-[#dfdfdf] text-xs font-mono text-[#707070] hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors"
-              title="Sign Out to Homepage"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Sign Out</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/login"
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-zinc-900 text-zinc-300 border border-zinc-700 font-semibold text-xs hover:text-white transition-all shadow-sm"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </Link>
+
+              <Link
+                href="/register"
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-all shadow-sm"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Register</span>
+              </Link>
+            </div>
           )}
 
           {/* Mobile hamburger trigger */}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="lg:hidden p-2 rounded-[6px] border border-[#dfdfdf] text-[#171717] hover:bg-[#fafafa]"
+            className="lg:hidden p-1.5 rounded-full bg-zinc-900 text-zinc-300 hover:text-white"
             aria-label="Toggle Navigation"
           >
             <div className="w-4 h-3.5 flex flex-col justify-between">
@@ -189,80 +162,24 @@ export function Navbar() {
 
       {/* Mobile Drawer */}
       {menuOpen && (
-        <div className="lg:hidden border-t border-[#ededed] bg-white p-4 space-y-2">
-          {(!isLoggedIn || isHomePage) ? (
-            <>
+        <div className="lg:hidden mt-2 border border-zinc-800 bg-black/95 backdrop-blur-xl rounded-2xl p-4 space-y-2 text-white">
+          {navLinks.map((link) => {
+            const isActive = pathname === link.href;
+            return (
               <Link
-                href="/"
+                key={link.href}
+                href={link.href}
                 onClick={() => setMenuOpen(false)}
-                className="block px-3 py-2 rounded-[6px] text-sm text-[#171717] font-medium bg-[#fafafa]"
+                className={`block px-3 py-2 rounded-lg text-xs font-medium ${
+                  isActive
+                    ? 'text-white bg-zinc-800 font-bold'
+                    : 'text-zinc-400 hover:bg-zinc-900'
+                }`}
               >
-                Home
+                {link.label}
               </Link>
-              <Link
-                href="/#about"
-                onClick={() => setMenuOpen(false)}
-                className="block px-3 py-2 rounded-[6px] text-sm text-[#707070] hover:bg-[#fafafa]"
-              >
-                About
-              </Link>
-              <Link
-                href="/#features"
-                onClick={() => setMenuOpen(false)}
-                className="block px-3 py-2 rounded-[6px] text-sm text-[#707070] hover:bg-[#fafafa]"
-              >
-                Features
-              </Link>
-              <Link
-                href="/login"
-                onClick={() => setMenuOpen(false)}
-                className="block px-3 py-2 rounded-[6px] text-sm font-medium text-center text-[#171717] bg-[#3ecf8e]"
-              >
-                Get started
-              </Link>
-            </>
-          ) : (
-            <>
-              <div className="text-[11px] font-mono uppercase text-[#707070] px-3 py-1">
-                Active: {role === 'ADMIN' ? 'Ministry Admin Portal' : 'Candidate Portal'}
-              </div>
-              <Link
-                href="/"
-                onClick={() => setMenuOpen(false)}
-                className="block px-3 py-2 rounded-[6px] text-sm text-[#707070] hover:bg-[#fafafa]"
-              >
-                Home
-              </Link>
-              {(role === 'ADMIN' ? adminLinks : candidateLinks).map((link) => {
-                const isActive = pathname === link.href;
-                return (
-                  <Link
-                    key={link.href + link.label}
-                    href={link.href}
-                    onClick={() => setMenuOpen(false)}
-                    className={`block px-3 py-2 rounded-[6px] text-sm ${
-                      isActive
-                        ? 'text-[#171717] bg-[#fafafa] font-medium'
-                        : 'text-[#707070] hover:bg-[#fafafa]'
-                    }`}
-                  >
-                    {link.label}
-                  </Link>
-                );
-              })}
-              <div className="pt-2 border-t border-[#ededed]">
-                <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    handleLogout();
-                  }}
-                  className="w-full py-2 text-center text-xs font-mono text-rose-600 hover:bg-rose-50 rounded-[6px]"
-                >
-                  Sign Out
-                </button>
-              </div>
-            </>
-          )}
+            );
+          })}
         </div>
       )}
     </header>

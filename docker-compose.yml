@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: neeti_vivaad_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-neeti_vivaad}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: neeti_vivaad_backend
+    restart: always
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-neeti-vivaad-sih2026-prod-secret-key-12345}
+      DEBUG: ${DEBUG:-True}
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: ${DB_NAME:-neeti_vivaad}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_HOST: db
+      DB_PORT: 5432
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/uploaded_docs:/app/uploaded_docs
+      - ./backend/media:/app/media
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: neeti_vivaad_frontend
+    restart: always
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_BASE: http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

@@ -3,153 +3,170 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Logo } from '../components/Logo';
-import { UserCheck, Shield, Lock, Mail, Building, User, ArrowRight, Sparkles } from 'lucide-react';
+import { VivaadTreeLogo } from '../components/Logo';
+import { Lock, Mail, Building, User, ArrowRight, Briefcase, Phone } from 'lucide-react';
+import { setTokens, setSavedUser } from '../utils/api';
 
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-  const [selectedRole, setSelectedRole] = useState<'OFFICIAL' | 'ADMIN'>('OFFICIAL');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Form State
-  const [email, setEmail] = useState('rajesh.kumar@mospi.gov.in');
-  const [password, setPassword] = useState('••••••••••••');
-  const [name, setName] = useState('Rajesh Kumar');
-  const [dept, setDept] = useState('NSO Field Operations Division');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [dept, setDept] = useState('');
+  const [designation, setDesignation] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
 
-  const handleSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const isAdmin = selectedRole === 'ADMIN' || email.includes('sharma') || email.includes('admin') || email.includes('dg');
-    const assignedRole = isAdmin ? 'ADMIN' : 'OFFICIAL';
-    
-    localStorage.setItem('user_role', assignedRole);
-    localStorage.setItem('is_authenticated', 'true');
-    localStorage.setItem('user_name', name || (isAdmin ? 'Dr. A. Sharma' : 'Rajesh Kumar'));
-    localStorage.setItem('user_email', email);
-    localStorage.setItem('user_dept', dept || (isAdmin ? 'Ministry Headquarters, New Delhi' : 'NSO Field Operations Division'));
-    
-    window.dispatchEvent(new Event('roleChange'));
-    window.dispatchEvent(new Event('authChange'));
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
-    if (assignedRole === 'ADMIN') {
-      router.push('/admin-dashboard');
-    } else {
-      router.push('/dashboard');
-    }
-  };
+    try {
+      if (mode === 'signin') {
+        const res = await fetch('http://127.0.0.1:8000/api/auth/login/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
 
-  const selectPreset = (role: 'OFFICIAL' | 'ADMIN') => {
-    setSelectedRole(role);
-    if (role === 'OFFICIAL') {
-      setEmail('rajesh.kumar@mospi.gov.in');
-      setPassword('••••••••••••');
-      setName('Rajesh Kumar');
-      setDept('NSO Field Operations Division');
-    } else {
-      setEmail('dr.sharma@mospi.gov.in');
-      setPassword('••••••••••••');
-      setName('Dr. A. Sharma');
-      setDept('Ministry Headquarters, New Delhi');
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || 'Invalid credentials. Please verify your email and password.');
+        }
+
+        setTokens(data.access, data.refresh);
+        setSavedUser(data.user);
+        window.dispatchEvent(new Event('roleChange'));
+
+        // Route based on profile and baseline completion
+        if (!data.user.profile_complete || !data.user.baseline_completed) {
+          router.push('/candidate/onboarding');
+        } else if (data.user.role === 'ADMIN') {
+          router.push('/admin-dashboard');
+        } else {
+          router.push('/dashboard');
+        }
+      } else {
+        // Sign Up / Register
+        const res = await fetch('http://127.0.0.1:8000/api/auth/register/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            first_name: firstName,
+            last_name: lastName,
+            email,
+            password,
+            department: dept,
+            designation: designation || 'Statistical Officer',
+            mobile_number: mobileNumber || undefined
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          const errMsg = typeof data === 'object' ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(' ') : 'Registration failed.';
+          throw new Error(errMsg);
+        }
+
+        setTokens(data.access, data.refresh);
+        setSavedUser(data.user);
+        window.dispatchEvent(new Event('roleChange'));
+
+        router.push('/candidate/onboarding');
+      }
+    } catch (err: any) {
+      setError(err.message || 'An error occurred.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-[#171717] font-sans selection:bg-[#3ecf8e] selection:text-[#171717] flex flex-col justify-between py-10 px-4">
+    <div className="min-h-screen bg-[#fafafa] text-[#171717] font-sans selection:bg-[#3ecf8e] selection:text-[#171717] flex flex-col items-center justify-center py-12 px-4">
       
-      {/* Top Header */}
-      <div className="max-w-[1280px] mx-auto w-full flex items-center justify-between">
-        <Link href="/">
-          <Logo size="md" />
-        </Link>
-        <Link href="/" className="text-xs font-mono text-[#707070] hover:text-[#171717]">
-          ← Back to Homepage
+      {/* Centered Logo Icon */}
+      <div className="mb-6">
+        <Link href="/" aria-label="Home">
+          <VivaadTreeLogo className="w-14 h-14 hover:scale-105 transition-transform" />
         </Link>
       </div>
 
-      {/* Main Container: Centered Clean Form Card */}
-      <div className="max-w-[500px] mx-auto w-full my-8">
+      {/* Main Form Card */}
+      <div className="max-w-[460px] mx-auto w-full">
         
-        <div className="card-supa-light space-y-6 shadow-xl border border-[#ededed]">
+        <div className="card-supa-light space-y-6 shadow-xl border border-[#dfdfdf] bg-white p-8 rounded-xl">
           
           {/* Mode Switcher */}
           <div className="flex items-center justify-between border-b border-[#ededed] pb-4">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setMode('signin')}
-                className={`text-lg font-medium transition-colors ${
+                type="button"
+                onClick={() => { setMode('signin'); setError(null); }}
+                className={`text-base font-medium transition-colors ${
                   mode === 'signin' ? 'text-[#171717] border-b-2 border-[#3ecf8e] pb-1' : 'text-[#707070]'
                 }`}
               >
-                Get Started / Sign In
+                Sign In
               </button>
               <button
-                onClick={() => setMode('signup')}
-                className={`text-lg font-medium transition-colors ml-4 ${
+                type="button"
+                onClick={() => { setMode('signup'); setError(null); }}
+                className={`text-base font-medium transition-colors ml-4 ${
                   mode === 'signup' ? 'text-[#171717] border-b-2 border-[#3ecf8e] pb-1' : 'text-[#707070]'
                 }`}
               >
                 Register Official
               </button>
             </div>
-            <span className="text-xs font-mono text-[#9a9a9a]">NEETI SAARTHI</span>
+            <span className="text-xs font-mono text-[#9a9a9a]">Neeti-Vivaad Auth</span>
           </div>
 
-          {/* Role Choice Selector Tabs */}
-          <div className="space-y-2">
-            <span className="text-[11px] font-mono text-[#707070] uppercase font-medium block">
-              Select Profile Role:
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => selectPreset('OFFICIAL')}
-                className={`flex items-center justify-center gap-2 p-3 rounded-[8px] border text-xs font-medium transition-all ${
-                  selectedRole === 'OFFICIAL'
-                    ? 'border-[#24b47e] bg-emerald-50/70 text-emerald-950 ring-2 ring-[#24b47e]/20'
-                    : 'border-[#dfdfdf] bg-white text-[#707070] hover:border-[#c7c7c7]'
-                }`}
-              >
-                <UserCheck className="w-4 h-4 text-[#24b47e]" />
-                <div className="text-left">
-                  <div className="font-semibold text-[#171717]">Candidate / Official</div>
-                  <div className="text-[10px] text-[#707070] font-mono">Rajesh Kumar (SSO)</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => selectPreset('ADMIN')}
-                className={`flex items-center justify-center gap-2 p-3 rounded-[8px] border text-xs font-medium transition-all ${
-                  selectedRole === 'ADMIN'
-                    ? 'border-[#644fc1] bg-purple-50/70 text-purple-950 ring-2 ring-[#644fc1]/20'
-                    : 'border-[#dfdfdf] bg-white text-[#707070] hover:border-[#c7c7c7]'
-                }`}
-              >
-                <Shield className="w-4 h-4 text-[#644fc1]" />
-                <div className="text-left">
-                  <div className="font-semibold text-[#171717]">Ministry Admin</div>
-                  <div className="text-[10px] text-[#707070] font-mono">Dr. Sharma (DG MoSPI)</div>
-                </div>
-              </button>
+          {error && (
+            <div className="p-3.5 rounded-[6px] bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+              {error}
             </div>
-          </div>
+          )}
 
           {/* Form Fields */}
           <form onSubmit={handleSubmit} className="space-y-4">
             
             {mode === 'signup' && (
               <>
-                <div className="space-y-1">
-                  <label className="text-xs font-mono text-[#707070] uppercase font-medium">Full Name</label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-[#707070] absolute left-3 top-3" />
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      placeholder="e.g. Rajesh Kumar"
-                      className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-[#dfdfdf] text-sm focus:border-[#3ecf8e] focus:outline-none bg-white"
-                    />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-mono text-[#707070] uppercase font-medium">First Name *</label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-[#707070] absolute left-3 top-3" />
+                      <input
+                        type="text"
+                        value={firstName}
+                        onChange={e => setFirstName(e.target.value)}
+                        required
+                        placeholder="First Name"
+                        className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-[#dfdfdf] text-sm focus:border-[#3ecf8e] focus:outline-none bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-mono text-[#707070] uppercase font-medium">Last Name *</label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-[#707070] absolute left-3 top-3" />
+                      <input
+                        type="text"
+                        value={lastName}
+                        onChange={e => setLastName(e.target.value)}
+                        required
+                        placeholder="Last Name"
+                        className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-[#dfdfdf] text-sm focus:border-[#3ecf8e] focus:outline-none bg-white"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -166,49 +183,59 @@ export default function LoginPage() {
                     />
                   </div>
                 </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-mono text-[#707070] uppercase font-medium">Designation</label>
+                  <div className="relative">
+                    <Briefcase className="w-4 h-4 text-[#707070] absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      value={designation}
+                      onChange={e => setDesignation(e.target.value)}
+                      placeholder="e.g. Senior Statistical Officer"
+                      className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-[#dfdfdf] text-sm focus:border-[#3ecf8e] focus:outline-none bg-white"
+                    />
+                  </div>
+                </div>
               </>
             )}
 
             <div className="space-y-1">
-              <label className="text-xs font-mono text-[#707070] uppercase font-medium">Govt Email / Official ID</label>
+              <label className="text-xs font-mono text-[#707070] uppercase font-medium">Official Email Address *</label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-[#707070] absolute left-3 top-3" />
                 <input
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="rajesh.kumar@mospi.gov.in"
+                  required
+                  placeholder="your.name@gov.in"
                   className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-[#dfdfdf] text-sm focus:border-[#3ecf8e] focus:outline-none bg-white"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-mono text-[#707070] uppercase font-medium">Password</label>
+              <label className="text-xs font-mono text-[#707070] uppercase font-medium">Password *</label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-[#707070] absolute left-3 top-3" />
                 <input
                   type="password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
+                  required
                   placeholder="••••••••••••"
                   className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-[#dfdfdf] text-sm focus:border-[#3ecf8e] focus:outline-none bg-white"
                 />
               </div>
             </div>
 
-            <div className="p-3 rounded-[6px] bg-[#fafafa] border border-[#ededed] text-xs text-[#707070] flex items-center justify-between">
-              <span>Next Destination:</span>
-              <span className="font-mono font-semibold text-[#171717]">
-                {selectedRole === 'ADMIN' ? '🏛️ Admin Heatmap & e-Recruitment' : '👤 Candidate Competency Profile'}
-              </span>
-            </div>
-
             <button
               type="submit"
-              className="w-full btn-primary-green py-2.5 text-sm font-medium shadow-xs mt-2 flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full btn-primary-green py-2.5 text-sm font-medium shadow-xs mt-3 flex items-center justify-center gap-2"
             >
-              <span>Get started with Neeti Saarthi</span>
+              <span>{loading ? 'Processing...' : (mode === 'signin' ? 'Sign In to Neeti-Vivaad' : 'Create Official Account')}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
@@ -216,11 +243,6 @@ export default function LoginPage() {
 
         </div>
 
-      </div>
-
-      {/* Footer */}
-      <div className="text-center text-[11px] font-mono text-[#9a9a9a]">
-        Grounded MoSPI SSO Authentication · Problem Statement SIH26101 · Neeti Saarthi
       </div>
 
     </div>

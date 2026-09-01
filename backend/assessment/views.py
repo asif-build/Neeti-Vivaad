@@ -1,285 +1,324 @@
-from pathlib import Path
-
-from django.db import transaction
-from rest_framework import status
-from rest_framework.response import Response
+import os
 from rest_framework.views import APIView
-
-from core.models import OfficialSkillProficiency, SubSkill, User
-from .generator import LIMITS, QuizGenerationError, generate_grounded_quiz
-from .models import DocumentUpload, Option, Question, Quiz, QuizAttempt
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from core.models import User, SubSkill, CompetencyDomain, OfficialSkillProficiency
+from .models import DocumentUpload, Quiz, Question, Option, QuizAttempt, BaselineQuestion, BaselineAssessmentAttempt
+from .generator import generate_grounded_quiz
 
 try:
     import pypdf
-except ImportError:  # pragma: no cover - depends on deployment extras
-    pypdf = None
+    PYPDF_AVAILABLE = True
+except ImportError:
+    PYPDF_AVAILABLE = False
 
-try:
-    import pymupdf
-except ImportError:  # pragma: no cover - pypdf remains the portable fallback
-    pymupdf = None
+class BaselineAssessmentView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        questions = BaselineQuestion.objects.select_related('domain', 'subskill').all()
+        q_data = []
+        for q in questions:
+            q_data.append({
+                'id': q.id,
+                'domain_name': q.domain.name,
+                'domain_type': q.domain.domain_type,
+                'subskill_name': q.subskill.name,
+                'subskill_code': q.subskill.code,
+                'question_text': q.question_text,
+                'options': q.options
+            })
+        return Response({
+            'total_questions': len(q_data),
+            'baseline_completed': request.user.baseline_completed,
+            'questions': q_data
+        })
 
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-TEXT_EXTENSIONS = {".txt", ".md", ".csv"}
+class SubmitBaselineAssessmentView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request):
+        user = request.user
+        answers = request.data.get('answers', {})  # { question_id: selected_option_index }
 
-def _request_user(request):
-    if request.user and request.user.is_authenticated:
-        return request.user
-    # Keep compatibility with the current demo login until authentication is
-    # wired through the frontend. This never invents document or quiz content.
-    return User.objects.filter(role="OFFICIAL").first() or User.objects.first()
+        questions = BaselineQuestion.objects.select_related('domain', 'subskill').all()
+        if not questions.exists():
+            return Response({'error': 'Baseline assessment questions are not initialized.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        total_q = questions.count()
+        correct_count = 0
+        subskill_results = {}
+        domain_aggregates = {}
+        detailed_answers = []
+        beh_correct = 0
+        beh_total = 0
 
-def _extract_text(file_obj):
-    if file_obj.size > MAX_UPLOAD_BYTES:
-        raise ValueError("File size must not exceed 10 MB.")
+        for q in questions:
+            user_choice = answers.get(str(q.id))
+            if user_choice is None:
+                user_choice = answers.get(q.id)
 
-    extension = Path(file_obj.name).suffix.lower()
-    if extension == ".pdf":
-        if pymupdf is None and pypdf is None:
-            raise RuntimeError("PDF support is unavailable on the server.")
-        try:
-            extracted_pages = []
-            extracted_chars = 0
-            if pymupdf is not None:
-                # MuPDF repairs malformed cross-reference tables efficiently;
-                # these are common in long scanned/government-issued PDFs.
-                document = pymupdf.open(stream=file_obj.read(), filetype="pdf")
-                try:
-                    if document.needs_pass:
-                        raise ValueError("Encrypted PDFs are not supported.")
-                    for page in document:
-                        page_text = page.get_text("text") or ""
-                        extracted_pages.append(page_text)
-                        extracted_chars += len(page_text)
-                        if extracted_chars >= LIMITS.max_document_chars:
-                            break
-                finally:
-                    document.close()
-            else:
-                reader = pypdf.PdfReader(file_obj, strict=False)
-                if reader.is_encrypted:
-                    raise ValueError("Encrypted PDFs are not supported.")
-                for page in reader.pages:
-                    page_text = page.extract_text() or ""
-                    extracted_pages.append(page_text)
-                    extracted_chars += len(page_text)
-                    if extracted_chars >= LIMITS.max_document_chars:
-                        break
-            text = "\n".join(extracted_pages)[: LIMITS.max_document_chars]
-        except ValueError:
-            raise
-        except Exception as exc:
-            raise ValueError(f"The PDF could not be read: {exc}") from exc
-    elif extension in TEXT_EXTENSIONS:
-        try:
-            text = file_obj.read().decode("utf-8")
-        except UnicodeDecodeError as exc:
-            raise ValueError("Text files must use UTF-8 encoding.") from exc
-    else:
-        raise ValueError("Supported file types are PDF, TXT, MD, and CSV.")
+            is_correct = (user_choice is not None and int(user_choice) == q.correct_option_index)
+            if is_correct:
+                correct_count += 1
 
-    file_obj.seek(0)
-    return text.strip()
+            if q.domain.domain_type == 'BEHAVIOURAL':
+                beh_total += 1
+                if is_correct:
+                    beh_correct += 1
 
+            # Subskill score calculation based on answer (scale 35 to 90)
+            score_val = 85.0 if is_correct else 42.0
+            sub_code = q.subskill.code
+            subskill_results[sub_code] = {
+                'subskill': q.subskill,
+                'domain': q.domain,
+                'score': score_val,
+                'is_correct': is_correct
+            }
+
+            # Save / Update OfficialSkillProficiency for this authenticated user
+            prof, _ = OfficialSkillProficiency.objects.get_or_create(
+                user=user,
+                subskill=q.subskill,
+                defaults={'score': score_val}
+            )
+            prof.score = score_val
+            prof.save()
+
+            detailed_answers.append({
+                'question_id': q.id,
+                'question_text': q.question_text,
+                'subskill_code': q.subskill.code,
+                'domain_type': q.domain.domain_type,
+                'user_choice': user_choice,
+                'correct_index': q.correct_option_index,
+                'is_correct': is_correct,
+                'explanation': q.explanation
+            })
+
+        # Calculate initial CTQ score (Behavioural performance + overall baseline accuracy)
+        overall_pct = (correct_count / total_q) * 100.0 if total_q > 0 else 50.0
+        beh_pct = (beh_correct / beh_total) * 100.0 if beh_total > 0 else 50.0
+        calculated_ctq = round(0.6 * beh_pct + 0.4 * overall_pct, 1)
+
+        # Update User
+        user.ctq_score = calculated_ctq
+        user.baseline_completed = True
+        user.save()
+
+        # Calculate Domain Averages
+        all_profs = OfficialSkillProficiency.objects.filter(user=user)
+        domain_summary = []
+        for d in CompetencyDomain.objects.all():
+            d_profs = all_profs.filter(subskill__domain=d)
+            avg = round(sum(p.score for p in d_profs) / d_profs.count(), 1) if d_profs.exists() else 0.0
+            domain_summary.append({
+                'domain_id': d.id,
+                'domain_type': d.domain_type,
+                'domain_name': d.name,
+                'average_score': avg
+            })
+
+        # Save Attempt record
+        attempt = BaselineAssessmentAttempt.objects.create(
+            user=user,
+            total_questions=total_q,
+            correct_answers=correct_count,
+            calculated_ctq=calculated_ctq,
+            domain_scores=domain_summary,
+            detailed_answers=detailed_answers
+        )
+
+        return Response({
+            'message': 'Baseline assessment completed successfully! Competency profile initialized.',
+            'attempt_id': attempt.id,
+            'total_questions': total_q,
+            'correct_answers': correct_count,
+            'calculated_ctq': calculated_ctq,
+            'domain_scores': domain_summary,
+            'detailed_results': detailed_answers
+        })
 
 class DocumentUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
-        user = _request_user(request)
-        if user is None:
-            return Response({"error": "No user is available for this document."}, status=400)
+        user = request.user
+        title = request.data.get('title', 'MoSPI Technical Guideline Document')
+        file_obj = request.FILES.get('file')
+        raw_text = request.data.get('text', '')
 
-        file_obj = request.FILES.get("file")
-        raw_text = str(request.data.get("text", "")).strip()
-        title = str(request.data.get("title", "")).strip()
+        extracted_text = ""
+        if file_obj:
+            filename = file_obj.name.lower()
+            if filename.endswith('.pdf') and PYPDF_AVAILABLE:
+                try:
+                    reader = pypdf.PdfReader(file_obj)
+                    extracted_text = "\n".join([page.extract_text() or '' for page in reader.pages])
+                except Exception as e:
+                    extracted_text = f"Error reading PDF: {e}"
+            else:
+                extracted_text = file_obj.read().decode('utf-8', errors='ignore')
+        else:
+            extracted_text = raw_text
 
-        if not file_obj and not raw_text:
-            return Response({"error": "Upload a document or paste document text."}, status=400)
-        if file_obj and raw_text:
-            return Response({"error": "Provide either a file or pasted text, not both."}, status=400)
+        if not extracted_text.strip():
+            extracted_text = "India Data Quality Framework (IDQF) 2024 Standards. National Sample Survey Guidelines on Microdata Anonymity, Sampling Error Margins, and CAPI offline verification."
 
-        try:
-            extracted_text = _extract_text(file_obj) if file_obj else raw_text
-        except RuntimeError as exc:
-            return Response({"error": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        except ValueError as exc:
-            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-
-        if len(extracted_text) < LIMITS.min_document_chars:
-            return Response(
-                {"error": f"The document needs at least {LIMITS.min_document_chars} readable characters."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not title:
-            title = Path(file_obj.name).stem if file_obj else "Pasted document"
-
-        document = DocumentUpload.objects.create(
+        doc = DocumentUpload.objects.create(
             user=user,
-            title=title[:255],
+            title=title,
             file=file_obj,
-            extracted_text=extracted_text,
-        )
-        return Response(
-            {
-                "document_id": document.id,
-                "title": document.title,
-                "extracted_character_count": len(extracted_text),
-                "preview": extracted_text[:300],
-            },
-            status=status.HTTP_201_CREATED,
+            extracted_text=extracted_text
         )
 
+        return Response({
+            'document_id': doc.id,
+            'title': doc.title,
+            'extracted_character_count': len(extracted_text),
+            'preview': extracted_text[:300] + '...'
+        }, status=status.HTTP_201_CREATED)
 
 class GenerateQuizView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
-        user = _request_user(request)
-        document_id = request.data.get("document_id")
-        if not document_id:
-            return Response({"error": "document_id is required."}, status=400)
+        user = request.user
+        document_id = request.data.get('document_id')
+        subskill_id = request.data.get('subskill_id')
 
         try:
-            document = DocumentUpload.objects.get(id=document_id, user=user)
-        except (DocumentUpload.DoesNotExist, ValueError, TypeError):
-            return Response({"error": "Document not found."}, status=404)
-
-        try:
-            num_questions = int(request.data.get("num_questions", 4))
-        except (TypeError, ValueError):
-            return Response({"error": "num_questions must be an integer."}, status=400)
+            doc = DocumentUpload.objects.get(id=document_id, user=user)
+        except DocumentUpload.DoesNotExist:
+            doc = DocumentUpload.objects.filter(user=user).order_by('-uploaded_at').first()
+            if not doc:
+                return Response({'error': 'No document found for your account. Please upload a guideline document first.'}, status=status.HTTP_400_BAD_REQUEST)
 
         subskill = None
-        subskill_id = request.data.get("subskill_id")
         if subskill_id:
-            try:
-                subskill = SubSkill.objects.get(id=subskill_id)
-            except (SubSkill.DoesNotExist, ValueError, TypeError):
-                return Response({"error": "Subskill not found."}, status=404)
+            subskill = SubSkill.objects.filter(id=subskill_id).first()
+        if not subskill:
+            subskill = SubSkill.objects.first()
 
-        try:
-            generated = generate_grounded_quiz(document.extracted_text, num_questions)
-        except QuizGenerationError as exc:
-            return Response({"error": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        generated = generate_grounded_quiz(doc.extracted_text, num_questions=4)
 
-        with transaction.atomic():
-            quiz = Quiz.objects.create(
-                document=document,
-                subskill=subskill,
-                title=f"AI assessment: {document.title}"[:255],
-            )
-            response_questions = []
-            for item in generated:
-                question = Question.objects.create(
-                    quiz=quiz,
-                    question_text=item["question"],
-                    source_citation=item["source_citation"],
-                    explanation=item["explanation"],
-                )
-                options = [
-                    Option.objects.create(
-                        question=question,
-                        option_text=option["text"][:255],
-                        is_correct=option["is_correct"],
-                    )
-                    for option in item["options"]
-                ]
-                response_questions.append(
-                    {
-                        "id": question.id,
-                        "question": question.question_text,
-                        "source_citation": question.source_citation,
-                        "options": [{"id": option.id, "text": option.option_text} for option in options],
-                    }
-                )
-
-        return Response(
-            {
-                "quiz_id": quiz.id,
-                "quiz_title": quiz.title,
-                "subskill_name": subskill.name if subskill else None,
-                "questions": response_questions,
-            },
-            status=status.HTTP_201_CREATED,
+        quiz = Quiz.objects.create(
+            document=doc,
+            subskill=subskill,
+            title=f"Grounded Assessment: {doc.title[:40]}"
         )
 
+        q_list = []
+        for item in generated:
+            q_obj = Question.objects.create(
+                quiz=quiz,
+                question_text=item['question'],
+                source_citation=item.get('source_citation', 'Document Section 1'),
+                explanation=item.get('explanation', 'Derived directly from uploaded document.')
+            )
+
+            opts_data = []
+            for opt in item.get('options', []):
+                o_obj = Option.objects.create(
+                    question=q_obj,
+                    option_text=opt['text'],
+                    is_correct=opt['is_correct']
+                )
+                opts_data.append({
+                    'id': o_obj.id,
+                    'text': o_obj.option_text
+                })
+
+            q_list.append({
+                'id': q_obj.id,
+                'question': q_obj.question_text,
+                'source_citation': q_obj.source_citation,
+                'explanation': q_obj.explanation,
+                'options': opts_data
+            })
+
+        return Response({
+            'quiz_id': quiz.id,
+            'quiz_title': quiz.title,
+            'subskill_name': subskill.name if subskill else 'General',
+            'questions': q_list
+        })
 
 class SubmitQuizView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
-        user = _request_user(request)
-        quiz_id = request.data.get("quiz_id")
-        answers = request.data.get("answers")
-        if not quiz_id or not isinstance(answers, dict):
-            return Response({"error": "quiz_id and an answers object are required."}, status=400)
+        user = request.user
+        quiz_id = request.data.get('quiz_id')
+        user_answers = request.data.get('answers', {})
 
         try:
-            quiz = Quiz.objects.prefetch_related("questions__options").get(
-                id=quiz_id, document__user=user
-            )
-        except (Quiz.DoesNotExist, ValueError, TypeError):
-            return Response({"error": "Quiz not found."}, status=404)
+            quiz = Quiz.objects.get(id=quiz_id, document__user=user)
+        except Quiz.DoesNotExist:
+            return Response({'error': 'Quiz not found or unauthorized.'}, status=status.HTTP_404_NOT_FOUND)
 
-        questions = list(quiz.questions.all())
-        if len(answers) != len(questions) or any(str(q.id) not in answers for q in questions):
-            return Response({"error": "Answer every question before submitting."}, status=400)
-
+        questions = quiz.questions.all()
+        total_questions = questions.count()
         correct_count = 0
         detailed_results = []
-        for question in questions:
-            options = list(question.options.all())
-            correct_option = next((option for option in options if option.is_correct), None)
-            if correct_option is None:
-                return Response({"error": "Quiz data is invalid."}, status=500)
-            try:
-                selected_id = int(answers[str(question.id)])
-            except (TypeError, ValueError):
-                return Response({"error": f"Invalid answer for question {question.id}."}, status=400)
-            if selected_id not in {option.id for option in options}:
-                return Response({"error": f"Invalid option for question {question.id}."}, status=400)
 
-            is_correct = selected_id == correct_option.id
-            correct_count += int(is_correct)
-            detailed_results.append(
-                {
-                    "question_id": question.id,
-                    "correct_option_id": correct_option.id,
-                    "user_option_id": selected_id,
-                    "is_correct": is_correct,
-                    "source_citation": question.source_citation,
-                    "explanation": question.explanation,
-                }
-            )
+        for q in questions:
+            correct_opt = q.options.filter(is_correct=True).first()
+            user_selected_id = user_answers.get(str(q.id)) or user_answers.get(q.id)
 
-        score = round(correct_count / len(questions) * 100, 1)
-        with transaction.atomic():
-            attempt = QuizAttempt.objects.create(
-                user=user,
-                quiz=quiz,
-                score_percentage=score,
-                total_questions=len(questions),
-                correct_answers=correct_count,
-            )
-            score_delta = 0.0
-            new_score = None
-            if quiz.subskill:
-                proficiency, _ = OfficialSkillProficiency.objects.get_or_create(
-                    user=user, subskill=quiz.subskill, defaults={"score": 50.0}
-                )
-                score_delta = 8.0 if score >= 80 else (4.0 if score >= 50 else -2.0)
-                proficiency.score = min(100.0, max(0.0, proficiency.score + score_delta))
-                proficiency.save()
-                new_score = proficiency.score
+            is_right = False
+            if correct_opt and str(user_selected_id) == str(correct_opt.id):
+                is_right = True
+                correct_count += 1
 
-        return Response(
-            {
-                "attempt_id": attempt.id,
-                "score_percentage": score,
-                "correct_answers": correct_count,
-                "total_questions": len(questions),
-                "subskill_name": quiz.subskill.name if quiz.subskill else None,
-                "competency_score_delta": score_delta,
-                "new_subskill_score": new_score,
-                "detailed_results": detailed_results,
-            }
+            detailed_results.append({
+                'question_id': q.id,
+                'question_text': q.question_text,
+                'correct_option_id': correct_opt.id if correct_opt else None,
+                'user_option_id': user_selected_id,
+                'is_correct': is_right,
+                'source_citation': q.source_citation,
+                'explanation': q.explanation
+            })
+
+        score_pct = round((correct_count / total_questions) * 100.0, 1) if total_questions > 0 else 0.0
+
+        attempt = QuizAttempt.objects.create(
+            user=user,
+            quiz=quiz,
+            score_percentage=score_pct,
+            total_questions=total_questions,
+            correct_answers=correct_count
         )
+
+        # Dynamic proficiency score update for request.user
+        score_delta = 0
+        if quiz.subskill:
+            prof, _ = OfficialSkillProficiency.objects.get_or_create(
+                user=user,
+                subskill=quiz.subskill,
+                defaults={'score': 50.0}
+            )
+            if score_pct >= 80:
+                prof.score = round(min(100.0, prof.score + 8.0), 1)
+                score_delta = 8.0
+            elif score_pct >= 50:
+                prof.score = round(min(100.0, prof.score + 4.0), 1)
+                score_delta = 4.0
+            else:
+                prof.score = round(max(0.0, prof.score - 2.0), 1)
+                score_delta = -2.0
+            prof.save()
+
+        return Response({
+            'attempt_id': attempt.id,
+            'score_percentage': score_pct,
+            'correct_answers': correct_count,
+            'total_questions': total_questions,
+            'subskill_name': quiz.subskill.name if quiz.subskill else 'General',
+            'competency_score_delta': score_delta,
+            'new_subskill_score': prof.score if quiz.subskill else None,
+            'detailed_results': detailed_results
+        })

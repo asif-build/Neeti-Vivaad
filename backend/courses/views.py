@@ -1,12 +1,15 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from core.models import User, OfficialSkillProficiency, RoleCompetencyRequirement
 from core.views import SkillGapAnalysisView
 from .models import Course
 from .recommendation import CourseRecommendationEngine
 
 class CourseListView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request):
         courses = Course.objects.all()
         data = []
@@ -27,12 +30,12 @@ class CourseListView(APIView):
         return Response({'courses': data})
 
 class RecommendedCoursesView(APIView):
-    def get(self, request):
-        user = request.user if request.user.is_authenticated else User.objects.filter(role='OFFICIAL').first()
-        if not user:
-            user = User.objects.first()
+    permission_classes = [IsAuthenticated]
 
-        # Fetch gaps using core gap calculation
+    def get(self, request):
+        user = request.user
+
+        # Fetch gaps using core gap calculation for request.user
         gap_view = SkillGapAnalysisView()
         gap_response = gap_view.get(request)
         gap_data = gap_response.data.get('all_gaps', [])
@@ -62,5 +65,7 @@ class RecommendedCoursesView(APIView):
 
         return Response({
             'official': user.get_full_name() or user.username,
+            'designation': user.designation,
+            'baseline_completed': user.baseline_completed,
             'recommendations': recs_data
         })

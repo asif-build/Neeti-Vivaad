@@ -28,12 +28,6 @@ export function NeetiHeroShowcase() {
           {/* Top Left: Headline & Description */}
           <div className="lg:col-span-7 space-y-4">
             
-            {/* Pill Tag */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#dfdfdf] text-xs font-mono text-[#171717] shadow-xs">
-              <span className="w-2 h-2 rounded-full bg-[#3ecf8e]" />
-              <span>Built for MoSPI · Aligned with iGOT Karmayogi · Grounded in NSC Standards</span>
-            </div>
-
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-medium tracking-tight text-[#171717] leading-[1.1]">
               Made for Statistical Officers.<br />
               <span className="text-[#707070]">Built for Policy Decision Makers.</span>

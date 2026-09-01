@@ -15,7 +15,7 @@ export function VirtualKeyboard({
   onKeyPress,
   onDelete,
   onEnter,
-  suggestions = ['"Rajesh"', 'rajesh.kumar@mospi.gov.in', 'SSO-NSO-2026'],
+  suggestions = ['"Survey"', 'official@mospi.gov.in', 'NSO-2026'],
   onSuggestionClick
 }: VirtualKeyboardProps) {
   const [isShift, setIsShift] = useState(false);

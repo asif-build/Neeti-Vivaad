@@ -13,14 +13,21 @@ class CompetencyDomainType(models.TextChoices):
 
 class User(AbstractUser):
     role = models.CharField(max_length=20, choices=UserRole.choices, default=UserRole.OFFICIAL)
-    department = models.CharField(max_length=150, default='National Statistical Office (NSO)')
-    designation = models.CharField(max_length=150, default='Senior Statistical Officer')
-    experience_years = models.IntegerField(default=5)
-    education = models.CharField(max_length=200, default='M.Sc. Statistics / Econometrics')
-    ctq_score = models.FloatField(default=75.0, help_text="Critical Thinking & Decision-Making Quotient")
+    mobile_number = models.CharField(max_length=20, blank=True, null=True)
+    organisation = models.CharField(max_length=200, default='Government of India', blank=True)
+    department = models.CharField(max_length=200, default='', blank=True)
+    designation = models.CharField(max_length=200, default='Statistical Officer', blank=True)
+    experience_years = models.FloatField(default=0.0)
+    education = models.CharField(max_length=300, default='', blank=True)
+    skills = models.JSONField(default=list, blank=True)
+    training_history = models.TextField(blank=True, default='')
+    learning_preferences = models.JSONField(default=dict, blank=True)
+    profile_complete = models.BooleanField(default=False)
+    baseline_completed = models.BooleanField(default=False)
+    ctq_score = models.FloatField(default=0.0, help_text="Critical Thinking & Decision-Making Quotient")
 
     def __str__(self):
-        return f"{self.get_full_name() or self.username} ({self.designation})"
+        return f"{self.get_full_name() or self.username} ({self.designation or 'Official'})"
 
 class CompetencyDomain(models.Model):
     name = models.CharField(max_length=100)

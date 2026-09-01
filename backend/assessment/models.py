@@ -1,5 +1,28 @@
 from django.db import models
-from core.models import User, SubSkill
+from core.models import User, SubSkill, CompetencyDomain
+
+class BaselineQuestion(models.Model):
+    domain = models.ForeignKey(CompetencyDomain, on_delete=models.CASCADE, related_name='baseline_questions')
+    subskill = models.ForeignKey(SubSkill, on_delete=models.CASCADE, related_name='baseline_questions')
+    question_text = models.TextField()
+    options = models.JSONField(default=list, help_text="List of string options")
+    correct_option_index = models.IntegerField(default=0)
+    explanation = models.TextField(blank=True, default='')
+
+    def __str__(self):
+        return f"[{self.subskill.code}] {self.question_text[:50]}..."
+
+class BaselineAssessmentAttempt(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='baseline_attempts')
+    total_questions = models.IntegerField(default=0)
+    correct_answers = models.IntegerField(default=0)
+    calculated_ctq = models.FloatField(default=0.0)
+    domain_scores = models.JSONField(default=dict)
+    detailed_answers = models.JSONField(default=list)
+    completed_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Baseline attempt by {self.user.username} at {self.completed_at}"
 
 class DocumentUpload(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')
@@ -38,7 +61,7 @@ class Option(models.Model):
         return f"{self.option_text} ({'Correct' if self.is_correct else 'Wrong'})"
 
 class QuizAttempt(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='quiz_attempts')
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE)
     score_percentage = models.FloatField(default=0.0)
     total_questions = models.IntegerField(default=0)

@@ -1,12 +1,15 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from core.models import User, OfficialSkillProficiency, SubSkill
 from .models import DebateScenario, DebateSession, DebateRound, AgentArgument, DecisionReport, FallacyChallenge
 from .mospi_rag import MoSPIRAGStore
 from .engine import AGENT_PERSONAS, generate_agent_argument, generate_fallacy_challenge, generate_decision_report
 
 class ScenariosListView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request):
         scenarios = DebateScenario.objects.all()
         data = []
@@ -21,12 +24,12 @@ class ScenariosListView(APIView):
         return Response({'scenarios': data})
 
 class StartDebateView(APIView):
-    def post(self, request):
-        user = request.user if request.user.is_authenticated else User.objects.filter(role='OFFICIAL').first()
-        if not user:
-            user = User.objects.first()
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request):
+        user = request.user
         scenario_id = request.data.get('scenario_id')
+
         try:
             scenario = DebateScenario.objects.get(id=scenario_id)
         except DebateScenario.DoesNotExist:
@@ -121,18 +124,20 @@ class StartDebateView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 class NextRoundView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
+        user = request.user
         session_id = request.data.get('session_id')
         try:
-            session = DebateSession.objects.get(id=session_id)
+            session = DebateSession.objects.get(id=session_id, user=user)
         except DebateSession.DoesNotExist:
-            return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Session not found or unauthorized.'}, status=status.HTTP_404_NOT_FOUND)
 
         last_round = session.rounds.order_by('-round_number').first()
         next_num = (last_round.round_number + 1) if last_round else 1
 
         if next_num > 4:
-            # Generate final decision report if not already existing
             if not hasattr(session, 'decision_report'):
                 generate_decision_report(session, session.rounds.all())
             return Response({'message': 'Debate concluded', 'status': 'CONCLUDED'})
@@ -229,33 +234,36 @@ class NextRoundView(APIView):
         })
 
 class InjectConstraintView(APIView):
-    """What-If Injector endpoint: changes active constraint mid-debate."""
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
+        user = request.user
         session_id = request.data.get('session_id')
         constraint_text = request.data.get('constraint_text', 'Budget reduced by 40%')
 
         try:
-            session = DebateSession.objects.get(id=session_id)
+            session = DebateSession.objects.get(id=session_id, user=user)
         except DebateSession.DoesNotExist:
-            return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Session not found or unauthorized.'}, status=status.HTTP_404_NOT_FOUND)
 
         session.active_constraint = constraint_text
         session.save()
 
-        # Trigger immediate what-if response round
         next_view = NextRoundView()
         return next_view.post(request)
 
 class AnswerFallacyView(APIView):
-    """Fallacy Hunter evaluation endpoint."""
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
+        user = request.user
         challenge_id = request.data.get('challenge_id')
         selected_option_index = request.data.get('option_index')
 
         try:
-            challenge = FallacyChallenge.objects.get(id=challenge_id)
+            challenge = FallacyChallenge.objects.get(id=challenge_id, session__user=user)
         except FallacyChallenge.DoesNotExist:
-            return Response({'error': 'Challenge not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Challenge not found or unauthorized.'}, status=status.HTTP_404_NOT_FOUND)
 
         is_correct = (int(selected_option_index) == challenge.correct_option_index)
         challenge.is_answered = True
@@ -263,14 +271,12 @@ class AnswerFallacyView(APIView):
         challenge.is_user_correct = is_correct
         challenge.save()
 
-        # Update User CTQ score
-        user = challenge.session.user
-        old_ctq = user.ctq_score
+        # Update User CTQ score dynamically
         ctq_delta = 5.0 if is_correct else -1.5
         user.ctq_score = round(min(100.0, max(0.0, user.ctq_score + ctq_delta)), 1)
         user.save()
 
-        # Feed CTQ into Behavioural/Managerial competency score
+        # Feed CTQ into Behavioural/Managerial competency score for this user
         beh_skill = SubSkill.objects.filter(domain__domain_type='BEHAVIOURAL').first()
         if beh_skill:
             prof, _ = OfficialSkillProficiency.objects.get_or_create(user=user, subskill=beh_skill)
@@ -287,11 +293,14 @@ class AnswerFallacyView(APIView):
         })
 
 class GetDebateSessionView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, session_id):
+        user = request.user
         try:
-            session = DebateSession.objects.get(id=session_id)
+            session = DebateSession.objects.get(id=session_id, user=user)
         except DebateSession.DoesNotExist:
-            return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Session not found or unauthorized.'}, status=status.HTTP_404_NOT_FOUND)
 
         rounds_data = []
         for r in session.rounds.all():

@@ -7,14 +7,16 @@ import { Logo } from './Logo';
 
 export function Footer() {
   const pathname = usePathname();
-  if (pathname !== '/') return null;
+
+  // Hide site-wide footer on /login page
+  if (pathname === '/login') return null;
 
   return (
     <footer className="border-t border-[#ededed] bg-white py-16 text-[#707070] text-xs font-sans">
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-8">
         
         <div className="space-y-3">
-          <Logo size="sm" />
+          <Logo size="sm" isDark={false} />
           <p className="text-xs text-[#707070] leading-[1.45]">
             AI-Powered Skill Intelligence &amp; Policy Debate Platform for India's Official Statistical System.
           </p>
@@ -23,11 +25,10 @@ export function Footer() {
         <div>
           <h4 className="font-medium text-[#171717] mb-3">Platform</h4>
           <ul className="space-y-2 text-xs">
-            <li><Link href="/dashboard" className="hover:text-[#171717] transition-colors">Candidate Profile</Link></li>
+            <li><Link href="/dashboard" className="hover:text-[#171717] transition-colors">Learner Profile</Link></li>
             <li><Link href="/courses" className="hover:text-[#171717] transition-colors">iGOT Courses</Link></li>
             <li><Link href="/quiz" className="hover:text-[#171717] transition-colors">AI Quiz Studio</Link></li>
-            <li><Link href="/debate" className="hover:text-[#171717] transition-colors">Neeti Saarthi Debate</Link></li>
-            <li><Link href="/admin-dashboard" className="hover:text-[#171717] transition-colors">Admin Heatmap &amp; e-Recruitment</Link></li>
+            <li><Link href="/debate" className="hover:text-[#171717] transition-colors">Neeti Vivaad Studio</Link></li>
           </ul>
         </div>
 
@@ -54,7 +55,7 @@ export function Footer() {
       </div>
 
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-6 border-t border-[#ededed] flex flex-col sm:flex-row items-center justify-between text-xs text-[#9a9a9a]">
-        <p>© 2026 Neeti Saarthi · Smart India Hackathon 2026</p>
+        <p>© 2026 Neeti Vivaad · Smart India Hackathon 2026</p>
         <p>Built for Ministry of Statistics and Programme Implementation</p>
       </div>
     </footer>
