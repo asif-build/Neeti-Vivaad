@@ -3,7 +3,9 @@ from .views import (
     RegisterView, VerifyEmailView, ResendVerificationEmailView,
     PasswordResetRequestView, PasswordResetConfirmView,
     LoginView, LogoutView, CurrentUserView,
-    ProfileView, CompetenciesView, SkillGapAnalysisView
+    ProfileView, CompetenciesView, SkillGapAnalysisView,
+    ResumeUploadView, ConfirmSkillsView, CareerGoalsView,
+    LearningPreferencesView, FinalizeCompetenciesView
 )
 
 urlpatterns = [
@@ -18,4 +20,11 @@ urlpatterns = [
     path('profile/', ProfileView.as_view(), name='profile'),
     path('competencies/', CompetenciesView.as_view(), name='competencies'),
     path('skill-gaps/', SkillGapAnalysisView.as_view(), name='skill-gaps'),
+
+    # Onboarding Pipeline Endpoints
+    path('onboarding/resume-upload/', ResumeUploadView.as_view(), name='onboarding-resume-upload'),
+    path('onboarding/confirm-skills/', ConfirmSkillsView.as_view(), name='onboarding-confirm-skills'),
+    path('onboarding/career-goals/', CareerGoalsView.as_view(), name='onboarding-career-goals'),
+    path('onboarding/learning-preferences/', LearningPreferencesView.as_view(), name='onboarding-learning-preferences'),
+    path('onboarding/finalize-competencies/', FinalizeCompetenciesView.as_view(), name='onboarding-finalize-competencies'),
 ]

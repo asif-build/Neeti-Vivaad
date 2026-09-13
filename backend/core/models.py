@@ -23,6 +23,7 @@ class CompetencyDomainType(models.TextChoices):
     BEHAVIOURAL = 'BEHAVIOURAL', 'Behavioural / Managerial'
 
 class User(AbstractUser):
+    email = models.EmailField(unique=True, help_text="Official email address (unique identifier)")
     role = models.CharField(max_length=20, choices=UserRole.choices, default=UserRole.OFFICIAL)
     status = models.CharField(max_length=30, choices=UserStatus.choices, default=UserStatus.PENDING_VERIFICATION)
     mobile_number = models.CharField(max_length=20, blank=True, null=True)
@@ -30,6 +31,9 @@ class User(AbstractUser):
     profile_complete = models.BooleanField(default=False)
     baseline_completed = models.BooleanField(default=False)
     ctq_score = models.FloatField(default=0.0, help_text="Critical Thinking & Decision-Making Quotient")
+    onboarding_tour_completed = models.BooleanField(default=False, help_text="Whether user has completed or dismissed the Neeti Saarthi Buddy tour")
+    buddy_voice_enabled = models.BooleanField(default=True, help_text="Whether voice output is enabled for Neeti Saarthi Buddy")
+    buddy_language = models.CharField(max_length=20, default='en', help_text="Language preference for Neeti Saarthi Buddy")
 
     @property
     def designation(self):
@@ -69,11 +73,20 @@ class OfficialProfile(models.Model):
     organisation = models.CharField(max_length=200, default='Government of India', blank=True)
     department = models.CharField(max_length=200, default='', blank=True)
     designation = models.CharField(max_length=200, default='Statistical Officer', blank=True)
+    current_role = models.CharField(max_length=200, default='', blank=True)
+    target_role = models.CharField(max_length=200, default='', blank=True)
+    career_goal = models.TextField(blank=True, default='')
     experience_years = models.FloatField(default=0.0)
     education = models.CharField(max_length=300, default='', blank=True)
+    certifications = models.JSONField(default=list, blank=True)
     skills = models.JSONField(default=list, blank=True)
+    confirmed_skills = models.JSONField(default=list, blank=True) # list of {skill, evidence, confidence, source, user_confirmed, domain_type}
+    resume_file = models.FileField(upload_to='resumes/', null=True, blank=True)
+    raw_resume_text = models.TextField(blank=True, default='')
+    extracted_resume_data = models.JSONField(default=dict, blank=True)
     training_history = models.TextField(blank=True, default='')
-    learning_preferences = models.JSONField(default=dict, blank=True)
+    learning_preferences = models.JSONField(default=dict, blank=True) # {preferred_formats, weekly_hours, preferred_difficulty}
+    onboarding_step = models.IntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -58,7 +58,7 @@ export default function AdminDashboard() {
           <Lock className="w-8 h-8" />
         </div>
         <h2 className="text-xl font-bold">Administrator Access Required</h2>
-        <p className="text-xs text-zinc-400 max-w-md text-center font-mono">
+        <p className="text-xs text-zinc-200 max-w-md text-center font-mono">
           The Ministry Leadership Skill Intelligence Dashboard is restricted to verified administrators and DG MoSPI credentials.
         </p>
         <Link href="/login" className="px-5 py-2.5 rounded-xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-500 transition-colors">
@@ -77,19 +77,19 @@ export default function AdminDashboard() {
         
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-950 border border-purple-800 text-purple-400 text-xs font-mono mb-3">
-            <Shield className="w-3.5 h-3.5" /> Ministry Leadership View (DG MoSPI)
+            <Shield className="w-3.5 h-3.5" /> Department Leadership Overview
           </div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">
-            Admin Skill Intelligence Dashboard
+            Admin Overview &amp; Analytics
           </h1>
-          <p className="text-xs text-zinc-400 mt-1 font-mono">
-            Org-Wide Competency Distribution · CTQ Metrics · iGOT Training Impact
+          <p className="text-xs text-zinc-200 mt-1 font-mono font-medium">
+            Department Skills Distribution &bull; Decision Readiness &bull; Training Participation
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <span className="px-3.5 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-emerald-400">
-            System Status: Healthy
+            System Status: Active
           </span>
         </div>
       </div>
@@ -97,35 +97,35 @@ export default function AdminDashboard() {
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="p-6 rounded-3xl bg-zinc-900/80 border border-zinc-800 shadow-xl space-y-2">
-          <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider block">Total Active Officials</span>
+          <span className="text-xs font-mono text-zinc-200 uppercase tracking-wider block font-bold">Total Active Officials</span>
           <div className="text-3xl font-extrabold text-white flex items-center gap-2">
             <Users className="w-6 h-6 text-cyan-400" /> {data.summary.total_officials}
           </div>
-          <span className="text-[11px] font-mono text-emerald-400">Across MoSPI Divisions</span>
+          <span className="text-[11px] font-mono text-emerald-400">Enrolled Across Divisions</span>
         </div>
 
         <div className="p-6 rounded-3xl bg-zinc-900/80 border border-zinc-800 shadow-xl space-y-2">
-          <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider block">Org Average CTQ</span>
+          <span className="text-xs font-mono text-zinc-200 uppercase tracking-wider block font-bold">Average Decision Readiness</span>
           <div className="text-3xl font-extrabold text-white flex items-center gap-2">
             <Award className="w-6 h-6 text-amber-400" /> {data.summary.org_average_ctq}
           </div>
-          <span className="text-[11px] font-mono text-emerald-400">Calculated from debates</span>
+          <span className="text-[11px] font-mono text-emerald-400">Based on decision exercises</span>
         </div>
 
         <div className="p-6 rounded-3xl bg-zinc-900/80 border border-zinc-800 shadow-xl space-y-2">
-          <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider block">Debates Concluded</span>
+          <span className="text-xs font-mono text-zinc-200 uppercase tracking-wider block font-bold">Exercises Completed</span>
           <div className="text-3xl font-extrabold text-white flex items-center gap-2">
             <Cpu className="w-6 h-6 text-purple-400" /> {data.summary.completed_debates_count}
           </div>
-          <span className="text-[11px] font-mono text-purple-400">Neeti Vivaad Simulations</span>
+          <span className="text-[11px] font-mono text-purple-400">Neeti Vivaad Sessions</span>
         </div>
 
         <div className="p-6 rounded-3xl bg-zinc-900/80 border border-zinc-800 shadow-xl space-y-2">
-          <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider block">Quizzes Taken</span>
+          <span className="text-xs font-mono text-zinc-200 uppercase tracking-wider block font-bold">Knowledge Checks Taken</span>
           <div className="text-3xl font-extrabold text-white flex items-center gap-2">
             <TrendingUp className="w-6 h-6 text-emerald-400" /> {data.summary.total_quizzes_taken}
           </div>
-          <span className="text-[11px] font-mono text-emerald-400">Grounded Assessments</span>
+          <span className="text-[11px] font-mono text-emerald-400">Official Assessments</span>
         </div>
       </div>
 
@@ -136,7 +136,7 @@ export default function AdminDashboard() {
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <Building className="w-5 h-5 text-cyan-400" /> Department-Wise Competency Heatmap
             </h2>
-            <p className="text-xs text-zinc-400 mt-1 font-mono">Average proficiency levels (0-100) across 4 core domains</p>
+            <p className="text-xs text-zinc-200 mt-1 font-mono font-medium">Average proficiency levels (0-100) across 4 core domains</p>
           </div>
         </div>
 

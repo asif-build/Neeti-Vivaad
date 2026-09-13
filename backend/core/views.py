@@ -47,7 +47,18 @@ class RegisterView(APIView):
                 'verification_token': str(token_obj.token),
                 'user': UserSerializer(user).data
             }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check specifically for email collision
+        if 'email' in serializer.errors:
+            email_errors = serializer.errors['email']
+            err_msg = email_errors[0] if isinstance(email_errors, list) else str(email_errors)
+            return Response({'error': err_msg, 'email_exists': True, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Fallback error formatting
+        first_key = list(serializer.errors.keys())[0]
+        first_err = serializer.errors[first_key]
+        err_msg = first_err[0] if isinstance(first_err, list) else str(first_err)
+        return Response({'error': err_msg, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 class VerifyEmailView(APIView):
     permission_classes = [AllowAny]
@@ -414,3 +425,217 @@ class SkillGapAnalysisView(APIView):
             'all_gaps': gaps,
             'gaps_by_domain': gaps_by_domain
         })
+
+from .resume_service import extract_text_from_file, analyze_resume, calculate_and_persist_competencies
+import os
+
+class ResumeUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        profile, _ = OfficialProfile.objects.get_or_create(user=user)
+
+        file_obj = request.FILES.get('resume')
+        raw_text_input = request.data.get('resume_text', '')
+
+        if not file_obj and not raw_text_input:
+            return Response(
+                {'error': 'Please provide a resume file (PDF, DOCX, TXT) or paste resume text.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if file_obj:
+            if file_obj.size > 10 * 1024 * 1024:
+                return Response(
+                    {'error': 'Resume file size exceeds the 10MB limit. Please upload a smaller file.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            filename = file_obj.name
+            ext = os.path.splitext(filename)[1].lower()
+            if ext not in ['.pdf', '.docx', '.doc', '.txt', '.rtf', '.md']:
+                return Response(
+                    {'error': f'Unsupported file type "{ext}". Please upload a PDF, DOCX, or TXT document.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            try:
+                raw_text = extract_text_from_file(file_obj, filename)
+                profile.resume_file = file_obj
+            except ValueError as ve:
+                return Response({'error': str(ve)}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                return Response({'error': f'Failed to process resume file: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            raw_text = raw_text_input.strip()
+            if len(raw_text) < 20:
+                return Response({'error': 'Resume text is too short. Please provide complete resume content.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        profile.raw_resume_text = raw_text
+
+        # Perform analysis (Gemini or deterministic rule-based extractor)
+        extracted_data = analyze_resume(raw_text, getattr(file_obj, 'name', 'resume.txt'))
+        profile.extracted_resume_data = extracted_data
+
+        # Update profile fields
+        if extracted_data.get('designation'):
+            profile.designation = extracted_data['designation']
+            profile.current_role = extracted_data['designation']
+        if extracted_data.get('department'):
+            profile.department = extracted_data['department']
+        if extracted_data.get('organisation'):
+            profile.organisation = extracted_data['organisation']
+        if extracted_data.get('experience_years'):
+            try:
+                profile.experience_years = float(extracted_data['experience_years'])
+            except (ValueError, TypeError):
+                pass
+        if extracted_data.get('education'):
+            profile.education = extracted_data['education']
+        if extracted_data.get('certifications'):
+            profile.certifications = extracted_data['certifications']
+
+        initial_skills = extracted_data.get('skills', [])
+        profile.confirmed_skills = initial_skills
+        profile.skills = [s['skill'] for s in initial_skills if isinstance(s, dict) and 'skill' in s]
+        profile.onboarding_step = 2
+        profile.save()
+
+        # Update User basics if extracted and empty
+        if extracted_data.get('first_name') and not user.first_name:
+            user.first_name = extracted_data['first_name']
+        if extracted_data.get('last_name') and not user.last_name:
+            user.last_name = extracted_data['last_name']
+        if extracted_data.get('mobile_number') and not user.mobile_number:
+            user.mobile_number = extracted_data['mobile_number']
+        user.save()
+
+        return Response({
+            'message': 'Resume analyzed successfully.',
+            'extracted_data': extracted_data,
+            'skills': initial_skills,
+            'profile': OfficialProfileSerializer(profile).data,
+            'user': UserSerializer(user).data
+        })
+
+class ConfirmSkillsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        profile, _ = OfficialProfile.objects.get_or_create(user=user)
+
+        skills_list = request.data.get('skills', [])
+        if not isinstance(skills_list, list):
+            return Response({'error': 'Skills must be an array of skill objects.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        cleaned_skills = []
+        for s in skills_list:
+            if isinstance(s, dict) and s.get('skill'):
+                cleaned_skills.append({
+                    'skill': str(s['skill']).strip(),
+                    'evidence': str(s.get('evidence', 'Confirmed by officer during onboarding')),
+                    'confidence': float(s.get('confidence', 0.85)),
+                    'source': str(s.get('source', 'RESUME')),
+                    'user_confirmed': bool(s.get('user_confirmed', True)),
+                    'domain_type': str(s.get('domain_type', 'STATISTICAL'))
+                })
+            elif isinstance(s, str) and s.strip():
+                cleaned_skills.append({
+                    'skill': s.strip(),
+                    'evidence': 'Added by officer during onboarding',
+                    'confidence': 0.85,
+                    'source': 'MANUAL_ENTRY',
+                    'user_confirmed': True,
+                    'domain_type': 'STATISTICAL'
+                })
+
+        profile.confirmed_skills = cleaned_skills
+        profile.skills = [s['skill'] for s in cleaned_skills]
+        profile.onboarding_step = 3
+        profile.save()
+
+        return Response({
+            'message': 'Skills confirmed successfully.',
+            'confirmed_skills': cleaned_skills,
+            'total_skills_count': len(cleaned_skills)
+        })
+
+class CareerGoalsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        profile, _ = OfficialProfile.objects.get_or_create(user=user)
+
+        current_role = request.data.get('current_role', profile.designation)
+        target_role = request.data.get('target_role', '')
+        career_goal = request.data.get('career_goal', '')
+
+        if current_role: profile.current_role = current_role
+        if target_role: profile.target_role = target_role
+        if career_goal: profile.career_goal = career_goal
+        
+        profile.onboarding_step = 4
+        profile.save()
+
+        return Response({
+            'message': 'Career goals saved successfully.',
+            'current_role': profile.current_role,
+            'target_role': profile.target_role,
+            'career_goal': profile.career_goal
+        })
+
+class LearningPreferencesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        profile, _ = OfficialProfile.objects.get_or_create(user=user)
+
+        preferred_formats = request.data.get('preferred_formats', ['Interactive Case Studies', 'Simulated Policy Debates'])
+        weekly_hours = request.data.get('weekly_hours', 5.0)
+        preferred_difficulty = request.data.get('preferred_difficulty', 'Intermediate')
+
+        prefs = {
+            'preferred_formats': preferred_formats,
+            'weekly_hours': float(weekly_hours),
+            'preferred_difficulty': preferred_difficulty
+        }
+
+        profile.learning_preferences = prefs
+        profile.onboarding_step = 5
+        profile.save()
+
+        return Response({
+            'message': 'Learning preferences saved successfully.',
+            'learning_preferences': prefs
+        })
+
+class FinalizeCompetenciesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        profile, _ = OfficialProfile.objects.get_or_create(user=user)
+
+        comp_result = calculate_and_persist_competencies(
+            user=user,
+            confirmed_skills=profile.confirmed_skills,
+            current_role=profile.current_role or profile.designation,
+            target_role=profile.target_role or profile.designation,
+            experience_years=profile.experience_years,
+            education=profile.education
+        )
+
+        user.refresh_from_db()
+
+        return Response({
+            'message': 'Official Competency Profile generated and stored in PostgreSQL.',
+            'user': UserSerializer(user).data,
+            'domain_scores': comp_result['domain_scores'],
+            'top_gaps': comp_result['top_gaps'],
+            'all_gaps': comp_result['all_gaps']
+        })
+

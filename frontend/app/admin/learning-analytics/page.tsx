@@ -181,7 +181,7 @@ export default function LearningAnalyticsPage() {
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center space-y-4">
         <AlertTriangle className="w-12 h-12 text-rose-500" />
         <h2 className="text-xl font-medium text-[#171717]">Unable to Load Learning Analytics</h2>
-        <p className="text-sm text-[#707070] max-w-md">{error || 'Failed to aggregate assessment and course data.'}</p>
+        <p className="text-sm text-[#374151] font-medium max-w-md">{error || 'Failed to aggregate assessment and course data.'}</p>
         <button
           onClick={fetchAnalytics}
           className="btn-primary-green px-4 py-2 text-xs flex items-center gap-2"
@@ -208,18 +208,18 @@ export default function LearningAnalyticsPage() {
         <div>
           <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-xs font-mono text-blue-800 mb-2">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-            <span>Training Effectiveness &amp; RAG Assessment Studio</span>
+            <span>Training Effectiveness &amp; Knowledge Analytics</span>
           </div>
-          <h1 className="text-3xl font-medium tracking-tight text-[#171717]">Learning Analytics</h1>
-          <p className="text-sm text-[#707070] mt-1 font-normal">
-            Measure training effectiveness, assessment performance and capability improvement across official cadres.
+          <h1 className="text-3xl font-medium tracking-tight text-[#171717]">Training Effectiveness</h1>
+          <p className="text-sm text-[#374151] font-medium mt-1">
+            Measure course completion, knowledge check performance, and skill growth across departments.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={fetchAnalytics}
-            className="p-2 rounded-[6px] border border-[#dfdfdf] hover:bg-[#fafafa] text-[#707070] transition-colors"
+            className="p-2 rounded-[6px] border border-[#dfdfdf] hover:bg-[#fafafa] text-[#374151] font-medium transition-colors"
             title="Refresh Metrics"
           >
             <RefreshCw className="w-4 h-4" />
@@ -238,33 +238,33 @@ export default function LearningAnalyticsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         <div className="card-supa-light p-5 space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#707070]">
+          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#111111] font-bold">
             <span>COURSES COMPLETED</span>
             <GraduationCap className="w-4 h-4 text-[#171717]" />
           </div>
           <div className="text-3xl font-semibold tracking-tight text-[#171717]">
             {kpis.courses_completed.toLocaleString()}
           </div>
-          <div className="text-xs text-[#707070]">
+          <div className="text-xs text-[#374151] font-medium">
             iGOT Karmayogi Integrated
           </div>
         </div>
 
         <div className="card-supa-light p-5 space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#707070]">
+          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#111111] font-bold">
             <span>ASSESSMENT ATTEMPTS</span>
             <FileText className="w-4 h-4 text-[#3b82f6]" />
           </div>
           <div className="text-3xl font-semibold tracking-tight text-[#171717]">
             {kpis.assessment_attempts.toLocaleString()}
           </div>
-          <div className="text-xs text-[#707070]">
+          <div className="text-xs text-[#374151] font-medium">
             Grounded MCQ Assessments
           </div>
         </div>
 
         <div className="card-supa-light p-5 space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#707070]">
+          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#111111] font-bold">
             <span>AVERAGE SCORE</span>
             <Award className="w-4 h-4 text-emerald-600" />
           </div>
@@ -277,14 +277,14 @@ export default function LearningAnalyticsPage() {
         </div>
 
         <div className="card-supa-light p-5 space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#707070]">
+          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#111111] font-bold">
             <span>SKILL IMPROVEMENT</span>
             <TrendingUp className="w-4 h-4 text-[#644fc1]" />
           </div>
           <div className="text-3xl font-semibold tracking-tight text-[#644fc1]">
             {kpis.skill_improvement}
           </div>
-          <div className="text-xs text-[#707070]">
+          <div className="text-xs text-[#374151] font-medium">
             Net Post-Training Gain
           </div>
         </div>
@@ -299,9 +299,9 @@ export default function LearningAnalyticsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-medium text-[#171717] text-base">Course &amp; Assessment Completion Velocity</h3>
-              <p className="text-xs text-[#707070]">Monthly throughput of learning completions and RAG quizzes</p>
+              <p className="text-xs text-[#374151] font-medium">Monthly throughput of learning completions and RAG quizzes</p>
             </div>
-            <span className="text-xs font-mono text-[#707070]">Last 6 Months</span>
+            <span className="text-xs font-mono text-[#374151] font-medium">Last 6 Months</span>
           </div>
 
           <div className="h-64 w-full">
@@ -331,11 +331,11 @@ export default function LearningAnalyticsPage() {
           <div className="flex items-center justify-center gap-6 text-xs pt-2 border-t border-[#ededed]">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-[#3ecf8e]" />
-              <span className="text-[#707070]">iGOT Course Completions</span>
+              <span className="text-[#374151] font-medium">iGOT Course Completions</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-[#3b82f6]" />
-              <span className="text-[#707070]">Grounded Quiz Assessments</span>
+              <span className="text-[#374151] font-medium">Grounded Quiz Assessments</span>
             </div>
           </div>
         </div>
@@ -345,9 +345,9 @@ export default function LearningAnalyticsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-medium text-[#171717] text-base">Assessment Score Tiers</h3>
-              <p className="text-xs text-[#707070]">Score tier distribution across all attempts</p>
+              <p className="text-xs text-[#374151] font-medium">Score tier distribution across all attempts</p>
             </div>
-            <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-[#fafafa] border border-[#dfdfdf] text-[#707070]">
+            <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-[#fafafa] border border-[#dfdfdf] text-[#374151] font-medium">
               MCQ Standardized
             </span>
           </div>
@@ -359,7 +359,7 @@ export default function LearningAnalyticsPage() {
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tier.color }} />
                     <span className="font-semibold text-[#171717]">{tier.tier}</span>
-                    <span className="text-[#707070]">({tier.label})</span>
+                    <span className="text-[#374151] font-medium">({tier.label})</span>
                   </div>
                   <span className="font-mono font-medium text-[#171717]">{tier.percentage}%</span>
                 </div>
@@ -427,14 +427,14 @@ export default function LearningAnalyticsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-medium text-[#171717] text-base">Course Effectiveness &amp; Capability ROI</h3>
-            <p className="text-xs text-[#707070]">Evaluating course completion rates, assessment pass scores, and verified competency gains</p>
+            <p className="text-xs text-[#374151] font-medium">Evaluating course completion rates, assessment pass scores, and verified competency gains</p>
           </div>
-          <span className="text-xs font-mono text-[#707070]">Catalog Analytics</span>
+          <span className="text-xs font-mono text-[#374151] font-medium">Catalog Analytics</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
-            <thead className="text-[11px] font-mono uppercase bg-[#fafafa] text-[#707070] border-y border-[#ededed]">
+            <thead className="text-[11px] font-mono uppercase bg-[#fafafa] text-[#111111] font-bold border-y border-[#ededed]">
               <tr>
                 <th className="px-4 py-3">iGOT Course / Title</th>
                 <th className="px-4 py-3">Competency Domain</th>
@@ -450,10 +450,10 @@ export default function LearningAnalyticsPage() {
                 <tr key={c.course_id} className="hover:bg-[#fafafa] transition-colors">
                   <td className="px-4 py-3.5">
                     <div className="font-semibold text-[#171717] max-w-sm">{c.title}</div>
-                    <div className="text-[11px] font-mono text-[#707070]">{c.igot_id}</div>
+                    <div className="text-[11px] font-mono text-[#374151] font-medium">{c.igot_id}</div>
                   </td>
-                  <td className="px-4 py-3.5 text-[#707070]">{c.domain}</td>
-                  <td className="px-4 py-3.5 text-[#707070]">{c.provider}</td>
+                  <td className="px-4 py-3.5 text-[#374151] font-medium">{c.domain}</td>
+                  <td className="px-4 py-3.5 text-[#374151] font-medium">{c.provider}</td>
                   <td className="px-4 py-3.5 text-center font-mono font-medium text-[#171717]">{c.completion_rate}</td>
                   <td className="px-4 py-3.5 text-center font-mono font-medium text-blue-600">{c.avg_assessment_score}</td>
                   <td className="px-4 py-3.5 text-center font-mono font-bold text-emerald-600">{c.competency_improvement}</td>
@@ -481,7 +481,7 @@ export default function LearningAnalyticsPage() {
               <AlertTriangle className="w-5 h-5 text-amber-500" />
               <h3 className="font-medium text-[#171717] text-base">Persistent Capability Deficits &amp; Corrective Refresher Pathways</h3>
             </div>
-            <p className="text-xs text-[#707070]">
+            <p className="text-xs text-[#374151] font-medium">
               Subskills where officials continue to encounter difficulty post-assessment, automatically linked to corrective iGOT course pathways.
             </p>
           </div>
@@ -493,7 +493,7 @@ export default function LearningAnalyticsPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <h4 className="font-medium text-sm text-[#171717]">{item.subskill_name}</h4>
-                  <span className="text-[11px] font-mono text-[#707070]">{item.subskill_code} · {item.domain_name}</span>
+                  <span className="text-[11px] font-mono text-[#374151] font-medium">{item.subskill_code} · {item.domain_name}</span>
                 </div>
                 <span className="text-xs font-mono font-bold text-rose-600 shrink-0">
                   -{item.deficit} pts
@@ -501,7 +501,7 @@ export default function LearningAnalyticsPage() {
               </div>
 
               <div className="space-y-1 pt-1 border-t border-[#ededed]">
-                <span className="text-[10px] font-mono uppercase text-[#707070] block">Recommended Remedial Course:</span>
+                <span className="text-[10px] font-mono uppercase text-[#111111] font-bold block">Recommended Remedial Course:</span>
                 <p className="text-xs text-emerald-900 font-medium">{item.recommended_course}</p>
               </div>
             </div>

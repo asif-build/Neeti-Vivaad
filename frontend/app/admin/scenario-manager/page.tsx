@@ -322,18 +322,18 @@ export default function ScenarioManagerPage() {
         <div>
           <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-xs font-mono text-purple-800 mb-2">
             <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-            <span>Neeti Vivaad Simulation Engine · Content &amp; Rules Orchestration</span>
+            <span>Neeti Vivaad &bull; Scenario Management</span>
           </div>
-          <h1 className="text-3xl font-medium tracking-tight text-[#171717]">Scenario Manager</h1>
-          <p className="text-sm text-[#707070] mt-1 font-normal">
-            Create, configure and manage evidence-grounded policy decision simulations and What-If constraints.
+          <h1 className="text-3xl font-medium tracking-tight text-[#171717]">Scenario Management</h1>
+          <p className="text-sm text-[#374151] font-medium mt-1">
+            Create and manage real-world policy situations and discussion twists for decision exercises.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={fetchScenarios}
-            className="p-2 rounded-[6px] border border-[#dfdfdf] hover:bg-[#fafafa] text-[#707070] transition-colors"
+            className="p-2 rounded-[6px] border border-[#dfdfdf] hover:bg-[#fafafa] text-[#374151] font-medium transition-colors"
             title="Refresh Scenarios"
           >
             <RefreshCw className="w-4 h-4" />
@@ -362,7 +362,7 @@ export default function ScenarioManagerPage() {
               
               {/* Category & Status Badges */}
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-[#fafafa] border border-[#dfdfdf] text-[#707070]">
+                <span className="text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-[#fafafa] border border-[#dfdfdf] text-[#374151] font-medium">
                   {sc.category}
                 </span>
                 <div className="flex items-center gap-2">
@@ -373,7 +373,7 @@ export default function ScenarioManagerPage() {
                   }`}>
                     {sc.status}
                   </span>
-                  <span className="text-[11px] font-mono text-[#707070] border border-[#ededed] px-1.5 py-0.5 rounded">
+                  <span className="text-[11px] font-mono text-[#374151] font-medium border border-[#ededed] px-1.5 py-0.5 rounded">
                     {sc.difficulty}
                   </span>
                 </div>
@@ -383,24 +383,24 @@ export default function ScenarioManagerPage() {
               <h3 className="text-base font-semibold text-[#171717] leading-snug">
                 {sc.title}
               </h3>
-              <p className="text-xs text-[#707070] leading-relaxed line-clamp-3">
+              <p className="text-xs text-[#374151] font-medium leading-relaxed line-clamp-3">
                 {sc.description}
               </p>
 
               {/* Metrics row */}
               <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#ededed] text-xs font-mono">
                 <div className="p-2 rounded bg-[#fafafa] border border-[#ededed]">
-                  <span className="text-[#707070] text-[10px] block">ATTEMPTS</span>
+                  <span className="text-[#111111] text-[10px] font-bold block">ATTEMPTS</span>
                   <span className="font-bold text-[#171717]">{sc.attempts_count} Sessions</span>
                 </div>
                 <div className="p-2 rounded bg-[#fafafa] border border-[#ededed]">
-                  <span className="text-[#707070] text-[10px] block">AVG CTQ SCORE</span>
+                  <span className="text-[#111111] text-[10px] font-bold block">AVG CTQ SCORE</span>
                   <span className="font-bold text-[#644fc1]">{sc.average_ctq} / 100</span>
                 </div>
               </div>
 
               {/* Grounding & Constraints count summary */}
-              <div className="flex items-center justify-between text-[11px] text-[#707070] pt-1">
+              <div className="flex items-center justify-between text-[11px] text-[#374151] font-medium pt-1">
                 <span className="flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                   <strong>{sc.reference_sources_count}</strong> Grounding Sources
@@ -434,7 +434,7 @@ export default function ScenarioManagerPage() {
                 </button>
                 <button
                   onClick={() => handleDeleteScenario(sc.id)}
-                  className="p-1 text-[#707070] hover:text-rose-600 transition-colors"
+                  className="p-1 text-[#374151] font-medium hover:text-rose-600 transition-colors"
                   title="Delete Scenario"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -453,10 +453,10 @@ export default function ScenarioManagerPage() {
             
             <div className="flex items-start justify-between border-b border-[#ededed] pb-4">
               <div>
-                <span className="text-xs font-mono uppercase text-[#707070]">Scenario Builder</span>
+                <span className="text-xs font-mono uppercase text-[#111111] font-bold">Scenario Builder</span>
                 <h3 className="text-xl font-medium text-[#171717]">Create Grounded Debate Scenario</h3>
               </div>
-              <button onClick={() => setShowCreateModal(false)} className="p-1 rounded-full hover:bg-[#fafafa] text-[#707070]">
+              <button onClick={() => setShowCreateModal(false)} className="p-1 rounded-full hover:bg-[#fafafa] text-[#374151] font-medium">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -478,7 +478,7 @@ export default function ScenarioManagerPage() {
                   placeholder="e.g. Direct Benefit Transfer Survey Redesign: Continuous Digital Capture vs 5-Year Sample"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full p-2.5 rounded-[6px] border border-[#dfdfdf] focus:border-[#171717] outline-none text-xs"
+                  className="w-full p-2.5 rounded-[6px] border border-[#dfdfdf] focus:border-[#171717] outline-none text-xs text-[#111111] font-medium placeholder:text-[#4B5563] bg-white"
                 />
               </div>
 
@@ -488,7 +488,7 @@ export default function ScenarioManagerPage() {
                   <select
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
-                    className="w-full p-2 rounded-[6px] border border-[#dfdfdf] text-xs bg-white"
+                    className="w-full p-2 rounded-[6px] border border-[#dfdfdf] text-xs text-[#111111] font-medium bg-white"
                   >
                     <option value="Data Policy">Data Policy</option>
                     <option value="Digital Governance">Digital Governance</option>
@@ -502,7 +502,7 @@ export default function ScenarioManagerPage() {
                   <select
                     value={newDifficulty}
                     onChange={(e) => setNewDifficulty(e.target.value as any)}
-                    className="w-full p-2 rounded-[6px] border border-[#dfdfdf] text-xs bg-white"
+                    className="w-full p-2 rounded-[6px] border border-[#dfdfdf] text-xs text-[#111111] font-medium bg-white"
                   >
                     <option value="Beginner">Beginner</option>
                     <option value="Intermediate">Intermediate</option>
@@ -515,7 +515,7 @@ export default function ScenarioManagerPage() {
                   <select
                     value={newStatus}
                     onChange={(e) => setNewStatus(e.target.value as any)}
-                    className="w-full p-2 rounded-[6px] border border-[#dfdfdf] text-xs bg-white"
+                    className="w-full p-2 rounded-[6px] border border-[#dfdfdf] text-xs text-[#111111] font-medium bg-white"
                   >
                     <option value="Active">Active (RAG Grounded)</option>
                     <option value="Draft">Draft</option>
@@ -532,7 +532,7 @@ export default function ScenarioManagerPage() {
                   placeholder="Describe the policy conflict, analytical trade-off, or statistical trade-off..."
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
-                  className="w-full p-2.5 rounded-[6px] border border-[#dfdfdf] focus:border-[#171717] outline-none text-xs"
+                  className="w-full p-2.5 rounded-[6px] border border-[#dfdfdf] focus:border-[#171717] outline-none text-xs text-[#111111] font-medium placeholder:text-[#4B5563] bg-white"
                 />
               </div>
 
@@ -543,7 +543,7 @@ export default function ScenarioManagerPage() {
                   placeholder="e.g. Standard 2026 MoSPI Operational Budget"
                   value={newConstraint}
                   onChange={(e) => setNewConstraint(e.target.value)}
-                  className="w-full p-2.5 rounded-[6px] border border-[#dfdfdf] text-xs"
+                  className="w-full p-2.5 rounded-[6px] border border-[#dfdfdf] text-xs text-[#111111] font-medium placeholder:text-[#4B5563] bg-white"
                 />
               </div>
 
@@ -554,7 +554,7 @@ export default function ScenarioManagerPage() {
                   placeholder="e.g. Evaluate data velocity trade-offs against multi-stage confidence interval stability"
                   value={newLearningObj}
                   onChange={(e) => setNewLearningObj(e.target.value)}
-                  className="w-full p-2.5 rounded-[6px] border border-[#dfdfdf] text-xs"
+                  className="w-full p-2.5 rounded-[6px] border border-[#dfdfdf] text-xs text-[#111111] font-medium placeholder:text-[#4B5563] bg-white"
                 />
               </div>
 
@@ -564,11 +564,11 @@ export default function ScenarioManagerPage() {
                   <label className="font-semibold text-[#171717]">
                     Attach Verified Grounding Sources *
                   </label>
-                  <span className="text-[11px] font-mono text-[#707070]">
+                  <span className="text-[11px] font-mono text-[#374151] font-medium">
                     Zero Hallucination RAG
                   </span>
                 </div>
-                <p className="text-[11px] text-[#707070]">
+                <p className="text-[11px] text-[#374151] font-medium">
                   Select the official MoSPI, NSC, or government publications that debate agents must strictly cite.
                 </p>
 
@@ -591,7 +591,7 @@ export default function ScenarioManagerPage() {
                         />
                         <div className="space-y-0.5">
                           <span className="font-medium text-[#171717] block">{ref.title}</span>
-                          <span className="text-[10px] font-mono text-[#707070]">{ref.doc_code} · {ref.publisher}</span>
+                          <span className="text-[10px] font-mono text-[#374151] font-medium">{ref.doc_code} · {ref.publisher}</span>
                         </div>
                       </label>
                     );
@@ -603,7 +603,7 @@ export default function ScenarioManagerPage() {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-[6px] border border-[#dfdfdf] text-xs text-[#707070] hover:bg-[#fafafa]"
+                  className="px-4 py-2 rounded-[6px] border border-[#dfdfdf] text-xs text-[#374151] font-medium hover:bg-[#fafafa]"
                 >
                   Cancel
                 </button>
@@ -631,7 +631,7 @@ export default function ScenarioManagerPage() {
                 <span className="text-xs font-mono uppercase text-blue-600 font-bold block">+ What-If Dynamic Trigger</span>
                 <h3 className="text-base font-semibold text-[#171717]">{selectedConstraintScenario.title}</h3>
               </div>
-              <button onClick={() => setSelectedConstraintScenario(null)} className="p-1 rounded-full hover:bg-[#fafafa] text-[#707070]">
+              <button onClick={() => setSelectedConstraintScenario(null)} className="p-1 rounded-full hover:bg-[#fafafa] text-[#374151] font-medium">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -645,13 +645,13 @@ export default function ScenarioManagerPage() {
             {/* List Existing Constraints */}
             {selectedConstraintScenario.constraints && selectedConstraintScenario.constraints.length > 0 && (
               <div className="space-y-2">
-                <span className="text-xs font-mono uppercase text-[#707070]">Existing Round Triggers</span>
+                <span className="text-xs font-mono uppercase text-[#111111] font-bold">Existing Round Triggers</span>
                 <div className="space-y-1.5 max-h-32 overflow-y-auto">
                   {selectedConstraintScenario.constraints.map((c, i) => (
                     <div key={i} className="p-2 rounded bg-[#fafafa] border border-[#ededed] text-xs flex items-center justify-between">
                       <div>
                         <span className="font-semibold text-[#171717]">{c.name}</span>
-                        <p className="text-[11px] text-[#707070]">{c.description}</p>
+                        <p className="text-[11px] text-[#374151] font-medium">{c.description}</p>
                       </div>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-50 text-blue-800 font-bold shrink-0">
                         Round {c.trigger_round}
@@ -671,7 +671,7 @@ export default function ScenarioManagerPage() {
                   placeholder="e.g. Mid-Year Budget Cut 30%"
                   value={conName}
                   onChange={(e) => setConName(e.target.value)}
-                  className="w-full p-2 rounded-[6px] border border-[#dfdfdf] text-xs"
+                  className="w-full p-2 rounded-[6px] border border-[#dfdfdf] text-xs text-[#111111] font-medium placeholder:text-[#4B5563] bg-white"
                 />
               </div>
 
@@ -683,7 +683,7 @@ export default function ScenarioManagerPage() {
                   placeholder="Describe how the real-world constraint changes the policy trade-off..."
                   value={conDesc}
                   onChange={(e) => setConDesc(e.target.value)}
-                  className="w-full p-2 rounded-[6px] border border-[#dfdfdf] text-xs"
+                  className="w-full p-2 rounded-[6px] border border-[#dfdfdf] text-xs text-[#111111] font-medium placeholder:text-[#4B5563] bg-white"
                 />
               </div>
 
@@ -693,7 +693,7 @@ export default function ScenarioManagerPage() {
                   <select
                     value={conRound}
                     onChange={(e) => setConRound(Number(e.target.value))}
-                    className="w-full p-2 rounded-[6px] border border-[#dfdfdf] text-xs bg-white"
+                    className="w-full p-2 rounded-[6px] border border-[#dfdfdf] text-xs text-[#111111] font-medium bg-white"
                   >
                     <option value={1}>Round 1: Opening</option>
                     <option value={2}>Round 2: Cross-Examination</option>
@@ -707,7 +707,7 @@ export default function ScenarioManagerPage() {
                     placeholder="e.g. Forces offline caching fallback"
                     value={conImpact}
                     onChange={(e) => setConImpact(e.target.value)}
-                    className="w-full p-2 rounded-[6px] border border-[#dfdfdf] text-xs"
+                    className="w-full p-2 rounded-[6px] border border-[#dfdfdf] text-xs text-[#111111] font-medium placeholder:text-[#4B5563] bg-white"
                   />
                 </div>
               </div>
@@ -716,7 +716,7 @@ export default function ScenarioManagerPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedConstraintScenario(null)}
-                  className="px-3 py-1.5 rounded-[6px] border border-[#dfdfdf] text-xs text-[#707070]"
+                  className="px-3 py-1.5 rounded-[6px] border border-[#dfdfdf] text-xs text-[#374151] font-medium"
                 >
                   Close
                 </button>
@@ -740,10 +740,10 @@ export default function ScenarioManagerPage() {
             
             <div className="flex items-start justify-between border-b border-[#ededed] pb-4">
               <div>
-                <span className="text-xs font-mono uppercase text-[#707070]">Scenario Performance</span>
+                <span className="text-xs font-mono uppercase text-[#111111] font-bold">Scenario Performance</span>
                 <h3 className="text-lg font-medium text-[#171717]">{selectedAnalyticsScenario.title}</h3>
               </div>
-              <button onClick={() => setSelectedAnalyticsScenario(null)} className="p-1.5 rounded-full hover:bg-[#fafafa] text-[#707070]">
+              <button onClick={() => setSelectedAnalyticsScenario(null)} className="p-1.5 rounded-full hover:bg-[#fafafa] text-[#374151] font-medium">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -753,15 +753,15 @@ export default function ScenarioManagerPage() {
                 
                 <div className="grid grid-cols-3 gap-2">
                   <div className="p-3 rounded bg-[#fafafa] border border-[#ededed] text-center">
-                    <span className="text-[#707070] text-[10px] block">TOTAL ATTEMPTS</span>
+                    <span className="text-[#111111] text-[10px] font-bold block">TOTAL ATTEMPTS</span>
                     <span className="text-base font-bold text-[#171717]">{analyticsData.total_attempts}</span>
                   </div>
                   <div className="p-3 rounded bg-[#fafafa] border border-[#ededed] text-center">
-                    <span className="text-[#707070] text-[10px] block">COMPLETION RATE</span>
+                    <span className="text-[#111111] text-[10px] font-bold block">COMPLETION RATE</span>
                     <span className="text-base font-bold text-emerald-600">{analyticsData.completion_rate}</span>
                   </div>
                   <div className="p-3 rounded bg-[#fafafa] border border-[#ededed] text-center">
-                    <span className="text-[#707070] text-[10px] block">AVERAGE CTQ</span>
+                    <span className="text-[#111111] text-[10px] font-bold block">AVERAGE CTQ</span>
                     <span className="text-base font-bold text-[#644fc1]">{analyticsData.average_ctq}</span>
                   </div>
                 </div>
@@ -775,19 +775,19 @@ export default function ScenarioManagerPage() {
                     <span className="font-semibold text-[#171717]">Decision Quality Score:</span>
                     <span className="font-mono font-bold text-emerald-600">{analyticsData.decision_score}</span>
                   </div>
-                  <div className="pt-1 text-[#707070] border-t border-[#ededed]">
+                  <div className="pt-1 text-[#374151] font-medium border-t border-[#ededed]">
                     Most Common Fallacy: <strong className="text-[#171717]">{analyticsData.most_common_fallacy}</strong>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <h4 className="font-mono uppercase text-[#707070] text-[11px]">Fallacy Accuracy by Type</h4>
+                  <h4 className="font-mono uppercase text-[#111111] font-bold text-[11px]">Fallacy Accuracy by Type</h4>
                   <div className="space-y-1.5">
                     {analyticsData.fallacy_breakdown.map((f: any, idx: number) => (
                       <div key={idx} className="p-2 rounded bg-[#fafafa] border border-[#ededed] flex items-center justify-between">
                         <span className="font-medium text-[#171717]">{f.fallacy}</span>
                         <div className="flex items-center gap-3 font-mono">
-                          <span className="text-[#707070]">{f.attempts_identified} Identified</span>
+                          <span className="text-[#374151] font-medium">{f.attempts_identified} Identified</span>
                           <span className="font-bold text-emerald-700">{f.accuracy} Acc</span>
                         </div>
                       </div>
@@ -797,7 +797,7 @@ export default function ScenarioManagerPage() {
 
               </div>
             ) : (
-              <div className="py-8 text-center text-xs font-mono text-[#707070]">Loading Scenario Analytics...</div>
+              <div className="py-8 text-center text-xs font-mono text-[#374151] font-medium">Loading Scenario Analytics...</div>
             )}
 
           </div>

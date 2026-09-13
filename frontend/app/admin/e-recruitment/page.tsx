@@ -4,12 +4,14 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Briefcase, CheckCircle2, Search, Filter, Sparkles, 
-  Award, Shield, Users, ArrowUpRight, ArrowRight, Download, RefreshCw
+  Award, Shield, Users, ArrowUpRight, ArrowRight, Download, RefreshCw, UserCheck
 } from 'lucide-react';
+import { authFetch } from '../../utils/api';
 
 interface Candidate {
   id: number;
   name: string;
+  email?: string;
   designation: string;
   department: string;
   experience: number;
@@ -17,7 +19,7 @@ interface Candidate {
   match_score: number;
   strengths: string[];
   gap_subskills: string[];
-  status: 'Ready for Deployment' | 'Upskilling Required' | 'Shortlisted' | 'Allocated';
+  status: string;
 }
 
 interface Vacancy {
@@ -34,6 +36,8 @@ export default function ERecruitmentPage() {
   const [selectedVacancy, setSelectedVacancy] = useState<string>('VAC-01');
   const [candidateFilter, setCandidateFilter] = useState<string>('ALL');
   const [allocatedCandidates, setAllocatedCandidates] = useState<Record<number, boolean>>({});
+  const [candidatesPool, setCandidatesPool] = useState<Candidate[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const vacancies: Vacancy[] = [
     {
@@ -65,80 +69,28 @@ export default function ERecruitmentPage() {
     }
   ];
 
-  const candidatesPool: Candidate[] = [
-    {
-      id: 1,
-      name: 'Rajesh Kumar',
-      designation: 'Senior Statistical Officer',
-      department: 'NSO Field Operations Division',
-      experience: 7,
-      ctq_score: 82.5,
-      match_score: 91.2,
-      strengths: ['Field Leadership', 'CAPI Survey Protocols', 'Policy Fallacy Detection'],
-      gap_subskills: ['Digital k-Anonymity (-43 pts)'],
-      status: 'Ready for Deployment'
-    },
-    {
-      id: 2,
-      name: 'Priya Sharma',
-      designation: 'Assistant Director (Statistics)',
-      department: 'Survey Design & Research Division',
-      experience: 9,
-      ctq_score: 89.0,
-      match_score: 94.8,
-      strengths: ['Multi-Stage Sampling', 'IDQF 2024 Standards', 'Critical Policy Synthesis'],
-      gap_subskills: ['SQL Analytical Window Functions (-12 pts)'],
-      status: 'Shortlisted'
-    },
-    {
-      id: 3,
-      name: 'Ananya Sen',
-      designation: 'Junior Statistical Officer',
-      department: 'Economic Statistics Division',
-      experience: 4,
-      ctq_score: 79.0,
-      match_score: 84.5,
-      strengths: ['Python Statistical Modeling', 'High-Frequency Survey Execution'],
-      gap_subskills: ['NDSAP Microdata Privacy Rules (-28 pts)'],
-      status: 'Ready for Deployment'
-    },
-    {
-      id: 4,
-      name: 'Vikramaditya Singh',
-      designation: 'Statistical Investigator (Gr. I)',
-      department: 'National Accounts Division',
-      experience: 6,
-      ctq_score: 84.0,
-      match_score: 88.0,
-      strengths: ['National Accounts Estimation', 'Microdata Anomaly Detection'],
-      gap_subskills: ['Digital Survey CAPI Entry (-18 pts)'],
-      status: 'Shortlisted'
-    },
-    {
-      id: 5,
-      name: 'Amit Verma',
-      designation: 'Field Supervisor',
-      department: 'NSO Field Operations Division',
-      experience: 8,
-      ctq_score: 77.5,
-      match_score: 72.0,
-      strengths: ['Block Verification', 'Enumerator Training'],
-      gap_subskills: ['Python/R Modeling (-35 pts)', 'NDSAP Sharing (-30 pts)'],
-      status: 'Upskilling Required'
-    },
-    {
-      id: 6,
-      name: 'Sunita Rao',
-      designation: 'Senior Statistical Officer',
-      department: 'Survey Design & Research Division',
-      experience: 11,
-      ctq_score: 91.0,
-      match_score: 96.0,
-      strengths: ['Survey Sampling Design', 'Policy Debate Champion', 'Data Quality Framework'],
-      gap_subskills: [],
-      status: 'Ready for Deployment'
-    }
-  ];
+  const fetchCandidates = () => {
+    setLoading(true);
+    authFetch('/api/admin/candidates/')
+      .then(res => res.json())
+      .then(data => {
+        if (data.candidates && Array.isArray(data.candidates)) {
+          setCandidatesPool(data.candidates);
+        } else {
+          setCandidatesPool([]);
+        }
+      })
+      .catch(() => {
+        setCandidatesPool([]);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchCandidates();
+  }, []);
 
   const handleAllocate = (candId: number) => {
     setAllocatedCandidates(prev => ({
@@ -148,199 +100,252 @@ export default function ERecruitmentPage() {
   };
 
   const activeVacancyObj = vacancies.find(v => v.id === selectedVacancy) || vacancies[0];
+
   const filteredCandidates = candidatesPool.filter(c => {
     if (candidateFilter === 'ALL') return true;
-    if (candidateFilter === 'READY') return c.status === 'Ready for Deployment' || c.status === 'Shortlisted';
-    if (candidateFilter === 'UPSKILLING') return c.status === 'Upskilling Required';
+    if (candidateFilter === 'READY') return c.status === 'Ready for Deployment';
+    if (candidateFilter === 'SHORTLISTED') return c.status === 'Shortlisted';
+    if (candidateFilter === 'UPSKILLING') return c.status === 'Upskilling Required' || c.status === 'Onboarding Pending';
+    if (candidateFilter === 'ALLOCATED') return allocatedCandidates[c.id];
     return true;
   });
 
   return (
-    <div className="min-h-screen bg-white text-[#171717] py-10 px-4 sm:px-6 lg:px-8 max-w-[1280px] mx-auto space-y-8 font-sans">
+    <div className="min-h-screen bg-white text-[#171717] font-sans selection:bg-[#3ecf8e] selection:text-[#171717] py-10 px-4 sm:px-6 lg:px-8 max-w-[1280px] mx-auto space-y-8">
       
-      {/* Header */}
+      {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#ededed] pb-6">
         <div>
-          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-mono text-emerald-800 mb-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span>AI-Driven Workforce Allocation Engine</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono font-medium mb-2">
+            <Sparkles className="w-3.5 h-3.5 text-[#3ecf8e]" />
+            <span>Role &amp; Cadre Matching</span>
           </div>
-          <h1 className="text-3xl font-medium tracking-tight text-[#171717]">e-Recruitment &amp; Placement</h1>
-          <p className="text-sm text-[#707070] mt-1 font-normal">
-            Automated candidate-to-vacancy matching based on verified competency benchmarks, CTQ scores, and debate judgments.
+          <h1 className="text-2xl sm:text-3xl font-medium tracking-tight text-[#171717]">
+            Role &amp; Cadre Matching
+          </h1>
+          <p className="text-xs sm:text-sm text-[#374151] font-medium mt-1 max-w-2xl">
+            Match verified skills and decision readiness scores with open positions across government departments.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <Link
-            href="/admin/workforce-insights"
-            className="px-3.5 py-2 rounded-[6px] border border-[#dfdfdf] hover:bg-[#fafafa] text-xs font-medium text-[#171717] transition-colors"
+          <button 
+            onClick={fetchCandidates}
+            className="btn-secondary-outline px-4 py-2.5 text-xs font-mono flex items-center gap-2"
           >
-            Workforce Insights
-          </Link>
-          <Link
-            href="/admin-dashboard"
-            className="btn-primary-green text-xs px-4 py-2 flex items-center gap-1.5"
-          >
-            <span>Admin Heatmap</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh Roster</span>
+          </button>
         </div>
       </div>
 
-      {/* Vacancy Selector */}
-      <div className="card-supa-light space-y-6 shadow-sm p-6">
-        <div className="flex items-center justify-between border-b border-[#ededed] pb-3">
-          <div>
-            <h2 className="text-base font-semibold text-[#171717]">Strategic Ministry Vacancies</h2>
-            <p className="text-xs text-[#707070]">Select a high-priority vacancy to inspect AI candidate suitability rankings</p>
-          </div>
-          <span className="text-xs font-mono text-[#707070]">3 Active Postings</span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {vacancies.map((v) => (
-            <button
-              key={v.id}
-              onClick={() => setSelectedVacancy(v.id)}
-              className={`p-4 rounded-[8px] text-left transition-all border ${
-                selectedVacancy === v.id
-                  ? 'border-[#3ecf8e] bg-emerald-50/40 ring-2 ring-[#3ecf8e]/20 shadow-xs'
-                  : 'border-[#ededed] bg-[#fafafa] hover:border-[#dfdfdf]'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-white border border-[#dfdfdf] text-[#707070]">
-                  {v.id}
-                </span>
-                <span className="text-xs font-mono font-medium text-emerald-700">
-                  {v.open_positions} Open Seats
-                </span>
-              </div>
-              <h4 className="font-semibold text-sm text-[#171717] leading-snug">{v.role_title}</h4>
-              <p className="text-[11px] text-[#707070] mt-1">{v.department}</p>
-              <div className="mt-3 pt-2 border-t border-[#ededed] flex items-center justify-between text-[11px] font-mono">
-                <span className="text-[#707070]">Req. CTQ: <strong>{v.required_ctq}+</strong></span>
-                <span className="text-[#24b47e] font-semibold">{v.key_competency.split('&')[0]}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Candidate Pool Roster */}
-      <div className="card-supa-light space-y-6 shadow-sm p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#ededed] pb-4">
-          <div>
-            <span className="text-xs font-mono uppercase text-[#707070] block">Target Role Candidate Match</span>
-            <h3 className="text-lg font-semibold text-[#171717]">{activeVacancyObj.role_title}</h3>
+      {/* Main Grid: Left Vacancies + Right Candidate Pool */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* Left Column: Priority Directorate Vacancies */}
+        <div className="lg:col-span-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-mono uppercase text-[#111111] font-bold flex items-center gap-2">
+              <Briefcase className="w-4 h-4 text-[#3ecf8e]" /> OPEN CADRE VACANCIES
+            </h2>
+            <span className="text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              {vacancies.reduce((a, b) => a + b.open_positions, 0)} Total Seats
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCandidateFilter('ALL')}
-              className={`px-3 py-1 rounded-[6px] text-xs font-mono transition-colors ${
-                candidateFilter === 'ALL' ? 'bg-[#171717] text-white' : 'bg-[#fafafa] border border-[#dfdfdf] text-[#707070]'
-              }`}
-            >
-              All Officials ({candidatesPool.length})
-            </button>
-            <button
-              onClick={() => setCandidateFilter('READY')}
-              className={`px-3 py-1 rounded-[6px] text-xs font-mono transition-colors ${
-                candidateFilter === 'READY' ? 'bg-emerald-600 text-white' : 'bg-[#fafafa] border border-[#dfdfdf] text-[#707070]'
-              }`}
-            >
-              Ready / Shortlisted
-            </button>
-            <button
-              onClick={() => setCandidateFilter('UPSKILLING')}
-              className={`px-3 py-1 rounded-[6px] text-xs font-mono transition-colors ${
-                candidateFilter === 'UPSKILLING' ? 'bg-amber-600 text-white' : 'bg-[#fafafa] border border-[#dfdfdf] text-[#707070]'
-              }`}
-            >
-              Upskilling Needed
-            </button>
-          </div>
-        </div>
-
-        {/* Candidate Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredCandidates.map((c) => {
-            const isAllocated = allocatedCandidates[c.id];
-            return (
-              <div
-                key={c.id}
-                className={`p-5 rounded-[8px] border transition-all space-y-4 ${
-                  isAllocated
-                    ? 'border-emerald-500 bg-emerald-50/60 shadow-xs'
-                    : 'border-[#ededed] bg-[#fafafa] hover:border-[#dfdfdf]'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#171717] text-[#3ecf8e] flex items-center justify-center font-bold text-sm">
-                      {c.name.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm text-[#171717]">{c.name}</h4>
-                      <p className="text-[11px] text-[#707070]">{c.designation} · {c.experience} yrs exp</p>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <div className="text-xs font-mono font-bold text-[#24b47e]">
-                      {c.match_score}% Match
-                    </div>
-                    <span className="text-[10px] font-mono text-[#707070]">
-                      CTQ: {c.ctq_score}
+          <div className="space-y-3">
+            {vacancies.map(v => {
+              const isSelected = selectedVacancy === v.id;
+              return (
+                <div
+                  key={v.id}
+                  onClick={() => setSelectedVacancy(v.id)}
+                  className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                    isSelected 
+                      ? 'border-[#3ecf8e] bg-[#fafafa] shadow-xs' 
+                      : 'border-[#dfdfdf] bg-white hover:border-[#c7c7c7]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-mono font-medium text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      {v.id} &bull; {v.open_positions} Open Seats
                     </span>
+                    <span className="text-[11px] font-mono text-[#374151] font-bold">Req CTQ: {v.required_ctq}+</span>
+                  </div>
+
+                  <h3 className="font-semibold text-sm text-[#171717]">{v.role_title}</h3>
+                  <p className="text-xs font-mono text-[#374151] font-medium mt-0.5">{v.department}</p>
+                  
+                  <div className="mt-3 pt-2.5 border-t border-[#ededed] flex items-center justify-between text-[11px] text-[#374151] font-medium">
+                    <span className="truncate pr-2">Core: {v.key_competency}</span>
+                    <ArrowRight className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-[#3ecf8e]' : 'text-zinc-600'}`} />
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        </div>
 
-                <div className="space-y-1.5 text-xs">
-                  <div className="text-[#707070] text-[11px]">
-                    Department: <strong className="text-[#171717]">{c.department}</strong>
-                  </div>
+        {/* Right Column: Live Candidate Pool & Allocation */}
+        <div className="lg:col-span-8 space-y-4">
+          
+          <div className="card-supa-light p-5 rounded-xl border border-[#dfdfdf] bg-[#fafafa] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <span className="text-[11px] font-mono uppercase text-[#111111] font-bold block">ACTIVE BENCHMARK TARGET</span>
+              <h3 className="font-semibold text-base text-[#171717] mt-0.5">{activeVacancyObj.role_title}</h3>
+              <p className="text-xs text-[#374151] font-medium mt-0.5">
+                Target Competency: <strong className="text-[#171717]">{activeVacancyObj.key_competency}</strong>
+              </p>
+            </div>
 
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {c.strengths.map((s, idx) => (
-                      <span key={idx} className="px-2 py-0.5 rounded bg-white border border-[#dfdfdf] text-[10px] text-emerald-800 font-medium">
-                        ✓ {s}
-                      </span>
-                    ))}
-                  </div>
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {[
+                { key: 'ALL', label: 'All Candidates' },
+                { key: 'READY', label: 'Deployment Ready' },
+                { key: 'ALLOCATED', label: 'Allocated' }
+              ].map(f => (
+                <button
+                  key={f.key}
+                  onClick={() => setCandidateFilter(f.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all ${
+                    candidateFilter === f.key
+                      ? 'bg-[#171717] text-white font-medium'
+                      : 'bg-white border border-[#dfdfdf] text-[#111111] font-bold hover:text-[#000000]'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-                  {c.gap_subskills.length > 0 && (
-                    <div className="pt-1 text-[11px] text-rose-700 font-mono">
-                      Gap: {c.gap_subskills.join(', ')}
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-3 border-t border-[#ededed] flex items-center justify-between">
-                  <span className={`text-[11px] font-mono font-semibold ${
-                    c.status === 'Ready for Deployment' ? 'text-emerald-700' :
-                    c.status === 'Shortlisted' ? 'text-blue-700' : 'text-amber-700'
-                  }`}>
-                    {isAllocated ? '✅ Role Allocated' : c.status}
-                  </span>
-
-                  <button
-                    onClick={() => handleAllocate(c.id)}
-                    className={`px-3 py-1 rounded-[4px] text-xs font-mono font-medium transition-all ${
+          {/* Candidates List */}
+          {loading ? (
+            <div className="p-12 text-center text-xs font-mono text-[#374151] font-medium border border-dashed border-[#dfdfdf] rounded-xl">
+              Loading verified official candidate pool from PostgreSQL...
+            </div>
+          ) : filteredCandidates.length === 0 ? (
+            <div className="p-12 text-center space-y-3 border border-dashed border-[#dfdfdf] rounded-xl bg-[#fafafa]">
+              <Users className="w-8 h-8 text-zinc-600 mx-auto" />
+              <h4 className="text-sm font-semibold text-[#171717]">No Candidates Found in This Filter</h4>
+              <p className="text-xs text-[#374151] font-medium max-w-md mx-auto">
+                Candidates appear dynamically as official accounts register, verify credentials, and complete onboarding.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredCandidates.map(cand => {
+                const isAllocated = !!allocatedCandidates[cand.id];
+                return (
+                  <div
+                    key={cand.id}
+                    className={`card-supa-light p-5 rounded-xl border transition-all space-y-4 ${
                       isAllocated
-                        ? 'bg-rose-100 text-rose-800 hover:bg-rose-200 border border-rose-300'
-                        : 'bg-[#171717] text-white hover:bg-[#3ecf8e] hover:text-[#171717]'
+                        ? 'border-emerald-300 bg-emerald-50/30'
+                        : 'border-[#dfdfdf] bg-white hover:border-[#c7c7c7]'
                     }`}
                   >
-                    {isAllocated ? 'Revoke Allocation' : 'Allocate to Role'}
-                  </button>
-                </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[#171717] text-[#3ecf8e] flex items-center justify-center font-bold text-sm">
+                          {cand.name.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-base text-[#171717]">{cand.name}</h4>
+                            {isAllocated ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-100 text-emerald-800 font-semibold">
+                                <UserCheck className="w-3 h-3" /> Allocated to Seat
+                              </span>
+                            ) : (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium ${
+                                cand.status === 'Ready for Deployment'
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                  : 'bg-amber-50 text-amber-800 border border-amber-200'
+                              }`}>
+                                {cand.status}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-[#374151] font-medium mt-0.5">
+                            {cand.designation} &bull; {cand.department} &bull; {cand.experience} Yrs Exp
+                          </p>
+                        </div>
+                      </div>
 
-              </div>
-            );
-          })}
+                      {/* CTQ & Match Badge */}
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right">
+                          <span className="text-[10px] font-mono uppercase text-[#374151] font-bold block">CTQ RATING</span>
+                          <span className="font-mono font-bold text-sm text-[#171717]">{cand.ctq_score} / 100</span>
+                        </div>
+                        <div className="text-right pl-3 border-l border-[#ededed]">
+                          <span className="text-[10px] font-mono uppercase text-[#374151] font-bold block">CADRE MATCH</span>
+                          <span className="font-mono font-bold text-sm text-emerald-700">{cand.match_score}%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Strengths & Gaps */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#ededed] text-xs">
+                      <div>
+                        <span className="text-[10px] font-mono text-[#374151] font-bold uppercase block mb-1">Demonstrated Strengths</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {cand.strengths.map((s, idx) => (
+                            <span key={idx} className="px-2 py-0.5 rounded bg-[#fafafa] border border-[#dfdfdf] text-[11px] text-[#171717]">
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-mono text-[#374151] font-bold uppercase block mb-1">Identified Focus Gaps</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {cand.gap_subskills.length > 0 ? (
+                            cand.gap_subskills.map((g, idx) => (
+                              <span key={idx} className="px-2 py-0.5 rounded bg-rose-50 border border-rose-200 text-[11px] text-rose-700 font-mono">
+                                {g}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[11px] text-emerald-700 font-mono">Zero Critical Gaps</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="pt-2 flex items-center justify-end gap-3 border-t border-[#ededed]">
+                      <button
+                        type="button"
+                        onClick={() => handleAllocate(cand.id)}
+                        className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                          isAllocated
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                            : 'btn-primary-green'
+                        }`}
+                      >
+                        {isAllocated ? (
+                          <>
+                            <span>Revoke Allocation</span>
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck className="w-3.5 h-3.5" />
+                            <span>Allocate to {activeVacancyObj.id}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
         </div>
 
       </div>

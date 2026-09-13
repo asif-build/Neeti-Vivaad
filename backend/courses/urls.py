@@ -1,8 +1,10 @@
 from django.urls import path
-from .views import CourseListView, RecommendedCoursesView
+from .views import CourseListView, CourseDetailView, RecommendedCoursesView
 
 urlpatterns = [
     path('', CourseListView.as_view(), name='course-list'),
     path('recommendations/', RecommendedCoursesView.as_view(), name='course-recommendations'),
     path('recommended/', RecommendedCoursesView.as_view(), name='course-recommended-alt'),
+    path('<str:course_id>/', CourseDetailView.as_view(), name='course-detail'),
 ]
+

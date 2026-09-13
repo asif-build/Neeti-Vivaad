@@ -86,7 +86,7 @@ function VerifyEmailContent() {
             <div className="py-12 space-y-4">
               <Loader2 className="w-10 h-10 text-[#3ecf8e] animate-spin mx-auto" />
               <h2 className="text-base font-semibold text-[#171717]">Verifying Official Email...</h2>
-              <p className="text-xs text-[#707070] font-mono">
+              <p className="text-xs text-[#374151] font-medium font-mono">
                 Validating cryptographic token and activating your Neethi Sarthi account.
               </p>
             </div>
@@ -103,12 +103,12 @@ function VerifyEmailContent() {
                   <ShieldCheck className="w-3.5 h-3.5" /> Account Status: ACTIVE
                 </span>
                 <h1 className="text-xl font-bold text-[#171717]">Email Verified Successfully!</h1>
-                <p className="text-xs text-[#707070] leading-relaxed">
+                <p className="text-xs text-[#374151] font-medium leading-relaxed">
                   Welcome aboard, <strong className="text-[#171717]">{userData?.first_name || 'Official'}</strong>. Your official credentials have been activated.
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl bg-[#fafafa] border border-[#ededed] text-left text-xs space-y-1.5 leading-relaxed text-[#707070]">
+              <div className="p-4 rounded-xl bg-[#fafafa] border border-[#ededed] text-left text-xs space-y-1.5 leading-relaxed text-[#374151] font-medium">
                 <strong className="text-[#171717] block">Next Step:</strong>
                 Complete your professional profile so our AI engine can calibrate your baseline competency profile and calculate your Critical Thinking Quotient (CTQ).
               </div>
@@ -169,7 +169,7 @@ function VerifyEmailContent() {
 export default function VerifyEmailPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center text-xs font-mono text-[#707070]">
+      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center text-xs font-mono text-[#374151] font-medium">
         Loading verification...
       </div>
     }>

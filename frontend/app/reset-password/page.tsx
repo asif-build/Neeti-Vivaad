@@ -58,8 +58,8 @@ function ResetPasswordContent() {
       <div className="min-h-screen bg-[#fafafa] flex items-center justify-center p-4">
         <div className="card-supa-light p-8 rounded-xl max-w-md w-full text-center space-y-4 shadow-xl border border-[#dfdfdf] bg-white">
           <AlertCircle className="w-10 h-10 text-rose-600 mx-auto" />
-          <h2 className="text-base font-bold text-[#171717]">Missing Password Reset Token</h2>
-          <p className="text-xs text-[#707070]">
+          <h2 className="text-base font-bold text-[#111111]">Missing Password Reset Token</h2>
+          <p className="text-xs text-[#374151] font-medium">
             Please click the password reset link sent to your registered official email address.
           </p>
           <Link href="/forgot-password" className="btn-primary-green py-2 px-4 inline-block text-xs font-semibold">
@@ -71,7 +71,7 @@ function ResetPasswordContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-[#171717] font-sans selection:bg-[#3ecf8e] selection:text-[#171717] flex flex-col items-center justify-center py-12 px-4">
+    <div className="min-h-screen bg-[#fafafa] text-[#111111] font-sans selection:bg-[#3ecf8e] selection:text-[#111111] flex flex-col items-center justify-center py-12 px-4">
       <div className="mb-6">
         <Link href="/" aria-label="Home">
           <VivaadTreeLogo className="w-14 h-14 hover:scale-105 transition-transform" />
@@ -82,10 +82,10 @@ function ResetPasswordContent() {
         <div className="card-supa-light space-y-6 shadow-xl border border-[#dfdfdf] bg-white p-8 rounded-xl">
           
           <div className="border-b border-[#ededed] pb-4">
-            <h1 className="text-xl font-semibold text-[#171717] flex items-center gap-2">
+            <h1 className="text-xl font-bold text-[#111111] flex items-center gap-2">
               <KeyRound className="w-5 h-5 text-emerald-600" /> Set New Password
             </h1>
-            <p className="text-xs text-[#707070] mt-1">
+            <p className="text-xs text-[#374151] font-medium mt-1">
               Choose a strong password to secure your Neethi Sarthi official credentials.
             </p>
           </div>
@@ -99,9 +99,9 @@ function ResetPasswordContent() {
           {!success ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-xs font-mono text-[#707070] uppercase font-medium">New Password *</label>
+                <label className="text-xs font-mono text-[#111111] uppercase font-bold">New Password *</label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-[#707070] absolute left-3 top-3" />
+                  <Lock className="w-4 h-4 text-[#4B5563] absolute left-3 top-3" />
                   <input
                     type="password"
                     value={password}
@@ -109,15 +109,15 @@ function ResetPasswordContent() {
                     required
                     minLength={6}
                     placeholder="Min 6 characters"
-                    className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-[#dfdfdf] text-sm focus:border-[#3ecf8e] focus:outline-none bg-white"
+                    className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-[#dfdfdf] text-sm text-[#111111] font-medium placeholder:text-[#4B5563] focus:border-[#3ecf8e] focus:outline-none bg-white"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-mono text-[#707070] uppercase font-medium">Confirm New Password *</label>
+                <label className="text-xs font-mono text-[#111111] uppercase font-bold">Confirm New Password *</label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-[#707070] absolute left-3 top-3" />
+                  <Lock className="w-4 h-4 text-[#4B5563] absolute left-3 top-3" />
                   <input
                     type="password"
                     value={confirmPassword}
@@ -125,7 +125,7 @@ function ResetPasswordContent() {
                     required
                     minLength={6}
                     placeholder="Confirm new password"
-                    className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-[#dfdfdf] text-sm focus:border-[#3ecf8e] focus:outline-none bg-white"
+                    className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-[#dfdfdf] text-sm text-[#111111] font-medium placeholder:text-[#4B5563] focus:border-[#3ecf8e] focus:outline-none bg-white"
                   />
                 </div>
               </div>
@@ -133,7 +133,7 @@ function ResetPasswordContent() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full btn-primary-green py-2.5 text-sm font-medium shadow-xs mt-2 flex items-center justify-center gap-2"
+                className="w-full btn-primary-green py-2.5 text-sm font-semibold shadow-xs mt-2 flex items-center justify-center gap-2"
               >
                 <span>{loading ? 'Updating Password...' : 'Save New Password & Sign In'}</span>
                 <ArrowRight className="w-4 h-4" />
@@ -146,8 +146,8 @@ function ResetPasswordContent() {
               </div>
 
               <div className="space-y-1">
-                <h3 className="text-base font-semibold text-[#171717]">Password Reset Successful!</h3>
-                <p className="text-xs text-[#707070]">
+                <h3 className="text-base font-bold text-[#111111]">Password Reset Successful!</h3>
+                <p className="text-xs text-[#374151] font-medium">
                   Your credentials have been updated in PostgreSQL. Redirecting you to Sign In...
                 </p>
               </div>
@@ -163,7 +163,7 @@ function ResetPasswordContent() {
 export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center text-xs font-mono text-[#707070]">
+      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center text-xs font-mono text-[#374151] font-medium">
         Loading password reset...
       </div>
     }>

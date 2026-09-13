@@ -6,12 +6,14 @@ from .admin_views import (
     ScenarioAdminDetailAPIView,
     ScenarioConstraintCreateAPIView,
     ScenarioAnalyticsAPIView,
-    ReferenceDocumentsListAPIView
+    ReferenceDocumentsListAPIView,
+    AdminCandidatesListAPIView
 )
 
 urlpatterns = [
     path('workforce-insights/', WorkforceInsightsAPIView.as_view(), name='admin-workforce-insights'),
     path('learning-analytics/', LearningAnalyticsAPIView.as_view(), name='admin-learning-analytics'),
+    path('candidates/', AdminCandidatesListAPIView.as_view(), name='admin-candidates-list'),
     path('scenarios/', ScenarioManagerListCreateAPIView.as_view(), name='admin-scenarios-list-create'),
     path('scenarios/<int:scenario_id>/', ScenarioAdminDetailAPIView.as_view(), name='admin-scenario-detail'),
     path('scenarios/<int:scenario_id>/constraints/', ScenarioConstraintCreateAPIView.as_view(), name='admin-scenario-constraint-create'),

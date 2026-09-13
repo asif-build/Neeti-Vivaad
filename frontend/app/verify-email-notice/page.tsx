@@ -63,21 +63,21 @@ function VerifyEmailNoticeContent() {
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-xl font-semibold text-[#171717]">Verify Your Official Email</h1>
-            <p className="text-xs text-[#707070] leading-relaxed">
-              We have dispatched an activation link to:
+            <h1 className="text-xl font-semibold text-[#171717]">Verify Your Email</h1>
+            <p className="text-xs text-[#374151] font-medium leading-relaxed">
+              We sent a verification link to:
             </p>
             <p className="text-sm font-mono font-bold text-[#171717] bg-[#f4f4f5] py-2 px-3 rounded-lg border border-[#e4e4e7] inline-block">
-              {email || 'your registered official email'}
+              {email || 'your registered email address'}
             </p>
           </div>
 
           <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-left text-xs text-emerald-900 space-y-1.5 leading-relaxed">
             <div className="font-semibold flex items-center gap-1.5 text-emerald-800">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" /> Account Status: PENDING_VERIFICATION
+              <ShieldCheck className="w-4 h-4 text-emerald-600" /> One Quick Step
             </div>
             <p className="text-[11px] text-emerald-700">
-              Please click the link inside the email to activate your account, complete your professional profile onboarding, and calibrate your baseline Critical Thinking Quotient (CTQ).
+              Click the link in your email to confirm your address and access your dashboard, skill overview, and recommended courses.
             </p>
           </div>
 
@@ -110,7 +110,7 @@ function VerifyEmailNoticeContent() {
               </span>
             </button>
 
-            <div className="flex items-center justify-between text-xs text-[#707070] pt-2">
+            <div className="flex items-center justify-between text-xs text-[#374151] font-medium pt-2">
               <Link href="/register" className="hover:text-[#171717] underline underline-offset-2">
                 Use different email
               </Link>
@@ -129,7 +129,7 @@ function VerifyEmailNoticeContent() {
 export default function VerifyEmailNoticePage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center text-xs font-mono text-[#707070]">
+      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center text-xs font-mono text-[#374151] font-medium">
         Loading verification details...
       </div>
     }>

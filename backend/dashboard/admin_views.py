@@ -562,3 +562,36 @@ class ReferenceDocumentsListAPIView(APIView):
                 } for d in docs
             ]
         })
+
+
+class AdminCandidatesListAPIView(APIView):
+    permission_classes = [IsAdminUserRole]
+
+    def get(self, request):
+        officials = User.objects.filter(role=UserRole.OFFICIAL).select_related('official_profile')
+        candidates = []
+        for u in officials:
+            strengths = []
+            gaps = []
+            user_profs = OfficialSkillProficiency.objects.filter(user=u).select_related('subskill')
+            for p in user_profs:
+                if p.score >= 75.0:
+                    strengths.append(p.subskill.name)
+                elif p.score < 65.0:
+                    gaps.append(f"{p.subskill.name} ({round(p.score - 80.0, 1)} pts)")
+
+            candidates.append({
+                'id': u.id,
+                'name': u.get_full_name() or u.username,
+                'email': u.email,
+                'designation': u.designation,
+                'department': u.department,
+                'experience': u.experience_years,
+                'ctq_score': u.ctq_score,
+                'match_score': min(98.0, max(60.0, round(70.0 + (u.ctq_score * 0.25), 1))),
+                'strengths': strengths[:3] if strengths else ['Official Account Active'],
+                'gap_subskills': gaps[:2],
+                'status': 'Ready for Deployment' if u.profile_complete else 'Onboarding Pending'
+            })
+        return Response({'candidates': candidates, 'total_count': len(candidates)})
+

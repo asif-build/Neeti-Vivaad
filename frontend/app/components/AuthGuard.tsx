@@ -6,9 +6,8 @@ import { usePathname, useRouter } from 'next/navigation';
 const PROTECTED_PREFIXES = [
   '/dashboard',
   '/admin-dashboard',
+  '/candidate/onboarding',
   '/candidate/baseline',
-  '/debate',
-  '/courses',
   '/reports',
   '/profile'
 ];
@@ -29,7 +28,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
     if (!savedRole && !token) {
-      router.push('/login');
+      const returnParam = pathname ? `?returnUrl=${encodeURIComponent(pathname)}` : '';
+      router.push(`/login${returnParam}`);
     }
   }, [pathname, isProtected, router]);
 

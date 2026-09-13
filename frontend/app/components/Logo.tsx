@@ -1,45 +1,99 @@
 import React from 'react';
 
-export function VivaadTreeLogo({ className = "w-7 h-7" }: { className?: string }) {
+interface LogoProps {
+  variant?: 'navbar' | 'auth' | 'hero' | 'dashboard' | 'compact' | 'footer' | 'emblem';
+  isDark?: boolean;
+  className?: string;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+/**
+ * Canonical Neeti Saarthi Brand Component
+ * Features mathematically transparent, crisp high-DPI assets with zero background box.
+ */
+export function NeetiSaarthiLogo({
+  variant = 'navbar',
+  isDark = false,
+  className = '',
+  size,
+}: LogoProps) {
+  // Select crisp transparent source depending on background darkness
+  const logoSrc = isDark
+    ? '/images/neeti_brand_logo_light_2x.png'
+    : '/images/neeti_brand_logo_dark_2x.png';
+
+  const emblemSrc = isDark
+    ? '/images/neeti_tree_emblem_light.png'
+    : '/images/neeti_tree_emblem_dark.png';
+
+  // Specific sizing variants
+  if (variant === 'emblem' || variant === 'compact') {
+    return (
+      <div className={`relative inline-flex items-center justify-center shrink-0 ${className || 'w-8 h-8'}`}>
+        <img
+          src={emblemSrc}
+          alt="Neeti Saarthi Tree Emblem"
+          width={512}
+          height={512}
+          loading="eager"
+          decoding="async"
+          className="w-full h-full object-contain block select-none"
+        />
+      </div>
+    );
+  }
+
+  let defaultClasses = 'h-9 sm:h-10';
+
+  if (variant === 'navbar') {
+    defaultClasses = 'h-8 sm:h-9 md:h-10';
+  } else if (variant === 'auth') {
+    defaultClasses = 'h-10 sm:h-12';
+  } else if (variant === 'hero') {
+    defaultClasses = 'h-12 sm:h-14';
+  } else if (variant === 'dashboard') {
+    defaultClasses = 'h-9 sm:h-10';
+  } else if (variant === 'footer') {
+    defaultClasses = 'h-9 sm:h-10';
+  }
+
+  // Backwards compatibility with size prop
+  if (size === 'sm') defaultClasses = 'h-7 sm:h-8';
+  if (size === 'md') defaultClasses = 'h-9 sm:h-10';
+  if (size === 'lg') defaultClasses = 'h-11 sm:h-13';
+
   return (
-    <div className={`relative flex items-center justify-center rounded-lg overflow-hidden shadow-sm ${className}`}>
+    <div className="inline-flex items-center group cursor-pointer select-none">
       <img
-        src="/assets/app_logo.png"
-        alt="Neeti Vivaad Logo"
-        className="w-full h-full object-cover rounded-lg"
+        src={logoSrc}
+        alt="NEETI SAARTHI - Skill Intelligence for a Stronger India"
+        width={1778}
+        height={384}
+        loading="eager"
+        decoding="async"
+        className={`${className || defaultClasses} w-auto max-w-full block object-contain transition-transform group-hover:scale-[1.01]`}
+        style={{ imageRendering: 'auto' }}
       />
     </div>
   );
 }
 
+export const BrandLogo = NeetiSaarthiLogo;
+export const Logo = NeetiSaarthiLogo;
+
+export function VivaadTreeLogo({ 
+  className = "w-10 h-10",
+  isDark = false 
+}: { 
+  className?: string;
+  isDark?: boolean;
+}) {
+  return <NeetiSaarthiLogo variant="emblem" className={className} isDark={isDark} />;
+}
+
 export const PlainviewSunLogo = VivaadTreeLogo;
 export const SupabazeEmeraldLogo = VivaadTreeLogo;
 
-export function Logo({ size = "md", isDark = true }: { size?: "sm" | "md" | "lg"; isDark?: boolean }) {
-  const iconSizes = {
-    sm: "w-6 h-6",
-    md: "w-7 h-7",
-    lg: "w-9 h-9"
-  };
+export default NeetiSaarthiLogo;
 
-  const textSizes = {
-    sm: "text-sm",
-    md: "text-base",
-    lg: "text-lg"
-  };
 
-  return (
-    <div className="flex items-center gap-2.5 group cursor-pointer">
-      <VivaadTreeLogo className={iconSizes[size]} />
-      <div className="flex flex-col">
-        <span className={`font-semibold tracking-tight ${isDark ? 'text-white' : 'text-[#171717]'} font-sans ${textSizes[size]} flex items-center gap-1.5 leading-none`}>
-          Neeti Vivaad
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#3ecf8e]" />
-        </span>
-        <span className={`text-[9px] tracking-widest uppercase font-mono ${isDark ? 'text-zinc-400' : 'text-[#707070]'} font-normal mt-0.5`}>
-          MOSPI SKILL INTELLIGENCE
-        </span>
-      </div>
-    </div>
-  );
-}

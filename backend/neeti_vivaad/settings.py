@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'assessment',
     'debate',
     'dashboard',
+    'buddy',
 ]
 
 MIDDLEWARE = [

@@ -252,7 +252,7 @@ export default function WorkforceInsightsPage() {
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center space-y-4">
         <AlertTriangle className="w-12 h-12 text-rose-500" />
         <h2 className="text-xl font-medium text-[#171717]">Unable to Load Workforce Insights</h2>
-        <p className="text-sm text-[#707070] max-w-md">{error || 'Server error occurred while aggregating workforce metrics.'}</p>
+        <p className="text-sm text-[#374151] font-medium max-w-md">{error || 'Server error occurred while aggregating workforce metrics.'}</p>
         <button
           onClick={fetchInsights}
           className="btn-primary-green px-4 py-2 text-xs flex items-center gap-2"
@@ -281,7 +281,7 @@ export default function WorkforceInsightsPage() {
             <span>Ministry Intelligence · Official Statistical Cadre</span>
           </div>
           <h1 className="text-3xl font-medium tracking-tight text-[#171717]">Workforce Insights</h1>
-          <p className="text-sm text-[#707070] mt-1 font-normal">
+          <p className="text-sm text-[#374151] font-medium mt-1">
             Organization-wide competency benchmarking, skill-gap detection and critical capability intelligence.
           </p>
         </div>
@@ -289,7 +289,7 @@ export default function WorkforceInsightsPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={fetchInsights}
-            className="p-2 rounded-[6px] border border-[#dfdfdf] hover:bg-[#fafafa] text-[#707070] transition-colors"
+            className="p-2 rounded-[6px] border border-[#dfdfdf] hover:bg-[#fafafa] text-[#374151] font-medium transition-colors"
             title="Refresh Metrics"
           >
             <RefreshCw className="w-4 h-4" />
@@ -308,46 +308,46 @@ export default function WorkforceInsightsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         <div className="card-supa-light p-5 space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#707070]">
+          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#111111] font-bold">
             <span>TOTAL OFFICIALS</span>
             <Users className="w-4 h-4 text-[#171717]" />
           </div>
           <div className="text-3xl font-semibold tracking-tight text-[#171717]">
             {kpis.total_officials.toLocaleString()}
           </div>
-          <div className="text-xs text-[#707070]">
+          <div className="text-xs text-[#374151] font-medium">
             Active Statistical &amp; IT Officers
           </div>
         </div>
 
         <div className="card-supa-light p-5 space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#707070]">
+          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#111111] font-bold">
             <span>AVG COMPETENCY</span>
             <BarChart3 className="w-4 h-4 text-[#3ecf8e]" />
           </div>
           <div className="text-3xl font-semibold tracking-tight text-[#171717]">
             {kpis.average_competency}%
           </div>
-          <div className="text-xs text-[#707070]">
+          <div className="text-xs text-[#374151] font-medium">
             Target Benchmark: 80.0%
           </div>
         </div>
 
         <div className="card-supa-light p-5 space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#707070]">
+          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#111111] font-bold">
             <span>CRITICAL SKILL GAPS</span>
             <AlertTriangle className="w-4 h-4 text-amber-500" />
           </div>
           <div className="text-3xl font-semibold tracking-tight text-amber-600">
             {kpis.critical_skill_gaps}
           </div>
-          <div className="text-xs text-[#707070]">
+          <div className="text-xs text-[#374151] font-medium">
             Deficits &gt; 25.0 pts needing training
           </div>
         </div>
 
         <div className="card-supa-light p-5 space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#707070]">
+          <div className="flex items-center justify-between text-xs font-mono uppercase text-[#111111] font-bold">
             <span>AVERAGE CTQ</span>
             <Award className="w-4 h-4 text-[#644fc1]" />
           </div>
@@ -370,9 +370,9 @@ export default function WorkforceInsightsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-medium text-[#171717] text-base">Competency Distribution</h3>
-              <p className="text-xs text-[#707070]">Officer proficiency tier breakdown</p>
+              <p className="text-xs text-[#374151] font-medium">Officer proficiency tier breakdown</p>
             </div>
-            <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-[#fafafa] border border-[#dfdfdf] text-[#707070]">
+            <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-[#fafafa] border border-[#dfdfdf] text-[#374151] font-medium">
               FAISS Benchmarked
             </span>
           </div>
@@ -402,7 +402,7 @@ export default function WorkforceInsightsPage() {
                   <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tier.color }} />
                   <span className="font-medium text-[#171717]">{tier.tier} ({tier.range})</span>
                 </div>
-                <div className="text-[#707070] mt-0.5 pl-3.5">
+                <div className="text-[#374151] font-medium mt-0.5 pl-3.5">
                   {tier.count} proficiencies · {tier.percentage}%
                 </div>
               </div>
@@ -415,9 +415,9 @@ export default function WorkforceInsightsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-medium text-[#171717] text-base">Competency by Domain</h3>
-              <p className="text-xs text-[#707070]">Comparative domain scores vs 82% target threshold (Click to inspect)</p>
+              <p className="text-xs text-[#374151] font-medium">Comparative domain scores vs 82% target threshold (Click to inspect)</p>
             </div>
-            <span className="text-xs font-mono text-[#707070]">4 Domains</span>
+            <span className="text-xs font-mono text-[#374151] font-medium">4 Domains</span>
           </div>
 
           <div className="space-y-4 pt-2">
@@ -435,7 +435,7 @@ export default function WorkforceInsightsPage() {
                       <h4 className="text-sm font-medium text-[#171717] group-hover:text-[#24b47e] transition-colors">
                         {d.name}
                       </h4>
-                      <span className="text-[10px] font-mono text-[#707070]">
+                      <span className="text-[10px] font-mono text-[#374151] font-medium">
                         ({d.subskills_count} Subskills)
                       </span>
                     </div>
@@ -470,7 +470,7 @@ export default function WorkforceInsightsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-medium text-[#171717] text-base">Top Priority Skill Gaps</h3>
-              <p className="text-xs text-[#707070]">Largest capability deficits across all units (Click to view courses)</p>
+              <p className="text-xs text-[#374151] font-medium">Largest capability deficits across all units (Click to view courses)</p>
             </div>
             <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-rose-50 border border-rose-200 text-rose-800">
               Needs Training
@@ -492,7 +492,7 @@ export default function WorkforceInsightsPage() {
                     <div className="text-sm font-medium text-[#171717] group-hover:text-[#24b47e] transition-colors">
                       {gap.subskill_name}
                     </div>
-                    <div className="text-xs text-[#707070] flex items-center gap-2 mt-0.5">
+                    <div className="text-xs text-[#374151] font-medium flex items-center gap-2 mt-0.5">
                       <span>{gap.subskill_code}</span>
                       <span>·</span>
                       <span>{gap.domain_name}</span>
@@ -504,7 +504,7 @@ export default function WorkforceInsightsPage() {
                   <span className="text-xs font-mono font-bold text-rose-600">
                     Gap: -{gap.avg_gap} pts
                   </span>
-                  <div className="text-[11px] text-[#707070]">
+                  <div className="text-[11px] text-[#374151] font-medium">
                     {gap.affected_officials} Officials
                   </div>
                 </div>
@@ -518,9 +518,9 @@ export default function WorkforceInsightsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-medium text-[#171717] text-base">Department Comparison</h3>
-              <p className="text-xs text-[#707070]">Proficiency &amp; CTQ scores across directorates (Click to inspect)</p>
+              <p className="text-xs text-[#374151] font-medium">Proficiency &amp; CTQ scores across directorates (Click to inspect)</p>
             </div>
-            <Building className="w-4 h-4 text-[#707070]" />
+            <Building className="w-4 h-4 text-[#374151] font-medium" />
           </div>
 
           <div className="space-y-3.5 pt-1">
@@ -535,7 +535,7 @@ export default function WorkforceInsightsPage() {
                     {dept.department}
                   </div>
                   <div className="flex items-center gap-3 text-xs font-mono">
-                    <span className="text-[#707070]">CTQ: <strong>{dept.average_ctq}</strong></span>
+                    <span className="text-[#374151] font-medium">CTQ: <strong>{dept.average_ctq}</strong></span>
                     <span className="text-emerald-700 font-bold">{dept.average_competency}%</span>
                   </div>
                 </div>
@@ -547,7 +547,7 @@ export default function WorkforceInsightsPage() {
                       style={{ width: `${dept.average_competency}%` }}
                     />
                   </div>
-                  <span className="text-[11px] text-[#707070] shrink-0 font-mono">
+                  <span className="text-[11px] text-[#374151] font-medium shrink-0 font-mono">
                     {dept.officials_count} Officers
                   </span>
                 </div>
@@ -565,18 +565,18 @@ export default function WorkforceInsightsPage() {
             <Award className="w-5 h-5 text-[#644fc1]" />
             <h3 className="text-base font-medium text-[#171717]">Critical Thinking Quotient (CTQ) Cadre Growth</h3>
           </div>
-          <p className="text-xs text-[#707070] max-w-2xl leading-relaxed">
+          <p className="text-xs text-[#374151] font-medium max-w-2xl leading-relaxed">
             The Critical Thinking &amp; Policy Decision Quotient tracks official performance across multi-agent policy simulation debates, fallacy identification challenges, and grounded RAG assessments.
           </p>
         </div>
 
         <div className="flex items-center gap-6 shrink-0">
           <div className="text-center">
-            <div className="text-xs font-mono text-[#707070] uppercase">Previous Qtr</div>
+            <div className="text-xs font-mono text-[#111111] uppercase font-bold">Previous Qtr</div>
             <div className="text-xl font-mono font-medium text-[#171717]">{kpis.ctq_trend.previous_period}</div>
           </div>
           <div className="text-center">
-            <div className="text-xs font-mono text-[#707070] uppercase">Current Cadre</div>
+            <div className="text-xs font-mono text-[#111111] uppercase font-bold">Current Cadre</div>
             <div className="text-2xl font-mono font-bold text-[#644fc1]">{kpis.ctq_trend.current_ctq}</div>
           </div>
           <div className="text-center pl-4 border-l border-[#ededed]">
@@ -592,25 +592,25 @@ export default function WorkforceInsightsPage() {
           <div className="bg-white rounded-[12px] border border-[#ededed] max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 space-y-6 shadow-2xl">
             <div className="flex items-start justify-between border-b border-[#ededed] pb-4">
               <div>
-                <span className="text-xs font-mono uppercase text-[#707070] block">Domain Intelligence</span>
+                <span className="text-xs font-mono uppercase text-[#111111] font-bold block">Domain Intelligence</span>
                 <h3 className="text-xl font-medium text-[#171717]">{selectedDomain.name}</h3>
               </div>
               <button
                 onClick={() => setSelectedDomain(null)}
-                className="p-1.5 rounded-full hover:bg-[#fafafa] text-[#707070]"
+                className="p-1.5 rounded-full hover:bg-[#fafafa] text-[#374151] font-medium"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="space-y-4">
-              <h4 className="text-xs font-mono uppercase text-[#707070]">Subskills Breakdown &amp; Affected Officers</h4>
+              <h4 className="text-xs font-mono uppercase text-[#111111] font-bold">Subskills Breakdown &amp; Affected Officers</h4>
               <div className="space-y-2">
                 {selectedDomain.subskills.map(s => (
                   <div key={s.id} className="p-3 rounded-[6px] bg-[#fafafa] border border-[#ededed] flex items-center justify-between text-xs">
                     <div>
                       <span className="font-semibold text-[#171717]">{s.name}</span>
-                      <span className="text-[#707070] ml-2">({s.code})</span>
+                      <span className="text-[#374151] font-medium ml-2">({s.code})</span>
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="text-rose-600 font-mono">{s.affected_officials} Need Upskilling</span>
@@ -622,7 +622,7 @@ export default function WorkforceInsightsPage() {
             </div>
 
             <div className="space-y-3 pt-2">
-              <h4 className="text-xs font-mono uppercase text-[#707070]">Recommended iGOT Karmayogi Courses</h4>
+              <h4 className="text-xs font-mono uppercase text-[#111111] font-bold">Recommended iGOT Karmayogi Courses</h4>
               <div className="space-y-2">
                 {selectedDomain.recommended_courses.map(c => (
                   <div key={c.id} className="p-3 rounded-[6px] bg-emerald-50/50 border border-emerald-200 flex items-center justify-between text-xs">
@@ -650,12 +650,12 @@ export default function WorkforceInsightsPage() {
           <div className="bg-white rounded-[12px] border border-[#ededed] max-w-lg w-full p-6 space-y-6 shadow-2xl">
             <div className="flex items-start justify-between border-b border-[#ededed] pb-4">
               <div>
-                <span className="text-xs font-mono uppercase text-[#707070] block">Directorate Metrics</span>
+                <span className="text-xs font-mono uppercase text-[#111111] font-bold block">Directorate Metrics</span>
                 <h3 className="text-xl font-medium text-[#171717]">{selectedDept.department}</h3>
               </div>
               <button
                 onClick={() => setSelectedDept(null)}
-                className="p-1.5 rounded-full hover:bg-[#fafafa] text-[#707070]"
+                className="p-1.5 rounded-full hover:bg-[#fafafa] text-[#374151] font-medium"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -663,19 +663,19 @@ export default function WorkforceInsightsPage() {
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-[6px] bg-[#fafafa] border border-[#ededed] space-y-1">
-                <span className="text-[#707070] block">Cadre Strength</span>
+                <span className="text-[#111111] font-bold block">Cadre Strength</span>
                 <span className="text-lg font-bold text-[#171717]">{selectedDept.officials_count} Officers</span>
               </div>
               <div className="p-3 rounded-[6px] bg-[#fafafa] border border-[#ededed] space-y-1">
-                <span className="text-[#707070] block">Avg Competency</span>
+                <span className="text-[#111111] font-bold block">Avg Competency</span>
                 <span className="text-lg font-bold text-emerald-700">{selectedDept.average_competency}%</span>
               </div>
               <div className="p-3 rounded-[6px] bg-[#fafafa] border border-[#ededed] space-y-1">
-                <span className="text-[#707070] block">Average CTQ</span>
+                <span className="text-[#111111] font-bold block">Average CTQ</span>
                 <span className="text-lg font-bold text-[#644fc1]">{selectedDept.average_ctq}</span>
               </div>
               <div className="p-3 rounded-[6px] bg-[#fafafa] border border-[#ededed] space-y-1">
-                <span className="text-[#707070] block">Training Completion</span>
+                <span className="text-[#111111] font-bold block">Training Completion</span>
                 <span className="text-lg font-bold text-[#171717]">{selectedDept.training_completion_rate}%</span>
               </div>
             </div>
@@ -696,11 +696,11 @@ export default function WorkforceInsightsPage() {
               <div>
                 <span className="text-xs font-mono uppercase text-rose-600 font-bold block">Capability Gap Details</span>
                 <h3 className="text-xl font-medium text-[#171717]">{selectedGap.subskill_name}</h3>
-                <span className="text-xs text-[#707070]">{selectedGap.subskill_code} · {selectedGap.domain_name}</span>
+                <span className="text-xs text-[#374151] font-medium">{selectedGap.subskill_code} · {selectedGap.domain_name}</span>
               </div>
               <button
                 onClick={() => setSelectedGap(null)}
-                className="p-1.5 rounded-full hover:bg-[#fafafa] text-[#707070]"
+                className="p-1.5 rounded-full hover:bg-[#fafafa] text-[#374151] font-medium"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -708,7 +708,7 @@ export default function WorkforceInsightsPage() {
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-[6px] bg-[#fafafa] border border-[#ededed] space-y-1">
-                <span className="text-[#707070] block">Average Proficiency</span>
+                <span className="text-[#111111] font-bold block">Average Proficiency</span>
                 <span className="text-lg font-bold text-[#171717]">{selectedGap.avg_proficiency}%</span>
               </div>
               <div className="p-3 rounded-[6px] bg-rose-50 border border-rose-200 space-y-1">
@@ -718,12 +718,12 @@ export default function WorkforceInsightsPage() {
             </div>
 
             <div className="space-y-2">
-              <h4 className="text-xs font-mono uppercase text-[#707070]">Curated Training Course Modules</h4>
+              <h4 className="text-xs font-mono uppercase text-[#111111] font-bold">Curated Training Course Modules</h4>
               {selectedGap.recommended_courses.map(c => (
                 <div key={c.id} className="p-3 rounded-[6px] bg-[#fafafa] border border-[#ededed] flex items-center justify-between text-xs">
                   <div className="space-y-0.5">
                     <div className="font-medium text-[#171717]">{c.title}</div>
-                    <div className="text-[11px] text-[#707070]">{c.igot_course_id} · {c.provider}</div>
+                    <div className="text-[11px] text-[#374151] font-medium">{c.igot_course_id} · {c.provider}</div>
                   </div>
                   <Link
                     href="/courses"

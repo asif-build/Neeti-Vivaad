@@ -49,7 +49,7 @@ export default function ForgotPasswordPage() {
             <h1 className="text-xl font-semibold text-[#171717] flex items-center gap-2">
               <KeyRound className="w-5 h-5 text-amber-600" /> Reset Password
             </h1>
-            <p className="text-xs text-[#707070] mt-1">
+            <p className="text-xs text-[#374151] mt-1 font-medium">
               Enter your official email address and we'll dispatch a secure, expiring password reset link.
             </p>
           </div>
@@ -63,16 +63,16 @@ export default function ForgotPasswordPage() {
           {!submitted ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-xs font-mono text-[#707070] uppercase font-medium">Official Email Address *</label>
+                <label className="text-xs font-mono text-[#111111] uppercase font-bold">Official Email Address *</label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-[#707070] absolute left-3 top-3" />
+                  <Mail className="w-4 h-4 text-[#111111] absolute left-3 top-3" />
                   <input
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     required
                     placeholder="name@organisation.gov.in"
-                    className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-[#dfdfdf] text-sm focus:border-[#3ecf8e] focus:outline-none bg-white"
+                    className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-[#dfdfdf] text-sm text-[#111111] font-medium placeholder:text-[#4B5563] focus:border-[#3ecf8e] focus:outline-none bg-white"
                   />
                 </div>
               </div>
@@ -94,19 +94,19 @@ export default function ForgotPasswordPage() {
 
               <div className="space-y-1">
                 <h3 className="text-base font-semibold text-[#171717]">Reset Instructions Dispatched</h3>
-                <p className="text-xs text-[#707070] leading-relaxed">
+                <p className="text-xs text-[#374151] leading-relaxed font-medium">
                   If an account exists with <strong className="text-[#171717]">{email}</strong>, a secure reset link valid for <strong>60 minutes</strong> has been sent.
                 </p>
               </div>
 
-              <div className="p-3 rounded-lg bg-[#f4f4f5] border border-[#e4e4e7] text-[11px] text-[#707070] text-left">
+              <div className="p-3 rounded-lg bg-[#f4f4f5] border border-[#e4e4e7] text-[11px] text-[#374151] text-left font-medium">
                 💡 Check your inbox (or Django development terminal if running locally) for the reset link.
               </div>
             </div>
           )}
 
           <div className="text-center pt-2 border-t border-[#ededed]">
-            <Link href="/login" className="inline-flex items-center gap-1.5 text-xs font-medium text-[#707070] hover:text-[#171717]">
+            <Link href="/login" className="inline-flex items-center gap-1.5 text-xs font-bold text-[#111111] hover:text-emerald-700">
               <ArrowLeft className="w-3.5 h-3.5" /> Back to Sign In
             </Link>
           </div>

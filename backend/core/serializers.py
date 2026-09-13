@@ -9,8 +9,11 @@ class OfficialProfileSerializer(serializers.ModelSerializer):
         model = OfficialProfile
         fields = [
             'id', 'organisation', 'department', 'designation',
-            'experience_years', 'education', 'skills', 'training_history',
-            'learning_preferences', 'created_at', 'updated_at'
+            'current_role', 'target_role', 'career_goal',
+            'experience_years', 'education', 'certifications',
+            'skills', 'confirmed_skills', 'extracted_resume_data',
+            'training_history', 'learning_preferences', 'onboarding_step',
+            'created_at', 'updated_at'
         ]
 
 class UserSerializer(serializers.ModelSerializer):
@@ -27,7 +30,8 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name', 'role',
             'mobile_number', 'is_email_verified', 'profile_complete', 'baseline_completed',
-            'ctq_score', 'date_joined', 'official_profile',
+            'ctq_score', 'onboarding_tour_completed', 'buddy_voice_enabled', 'buddy_language',
+            'date_joined', 'official_profile',
             'designation', 'department', 'organisation', 'experience_years', 'education', 'skills'
         ]
         read_only_fields = ['id', 'date_joined']
@@ -84,9 +88,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         ]
 
     def validate_email(self, value):
-        if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError("An account with this email address already exists.")
-        return value.lower()
+        if User.objects.filter(email__iexact=value.strip()).exists():
+            raise serializers.ValidationError("An account already exists with this email address. Please log in with your account.")
+        return value.strip().lower()
 
     def create(self, validated_data):
         password = validated_data.pop('password')
