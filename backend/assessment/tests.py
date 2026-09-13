@@ -102,3 +102,135 @@ class QuizApiTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 400)
+
+
+class DocumentExtractionTests(TestCase):
+    def test_docx_in_memory_extraction(self):
+        import io
+        import docx
+        from assessment.extraction import process_document_source
+
+        doc = docx.Document()
+        doc.add_heading("National Statistical Protocol", level=1)
+        doc.add_paragraph("All microdata must adhere to k-anonymity where k is at least 5 before dissemination.")
+        doc.add_paragraph("Supervisory audit must occur within 48 hours of field collection completion.")
+        buf = io.BytesIO()
+        doc.save(buf)
+        file_bytes = buf.getvalue()
+
+        result = process_document_source(file_bytes, "protocol.docx")
+        self.assertEqual(result["file_type"], "DOCX")
+        self.assertTrue(len(result["chunks"]) >= 1)
+        self.assertIn("k-anonymity", result["extracted_text"])
+
+    def test_rejects_unsupported_file_extension(self):
+        from assessment.extraction import process_document_source, DocumentExtractionError
+        with self.assertRaises(DocumentExtractionError):
+            process_document_source(b"binary content", "script.exe")
+
+    def test_rejects_unreadable_or_empty_text(self):
+        from assessment.extraction import process_document_source, DocumentExtractionError
+        with self.assertRaises(DocumentExtractionError):
+            process_document_source(b"too short", "note.txt")
+
+
+class StudioLifecycleAndSecurityTests(TestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(username="author1", email="author1@gov.in", password="password")
+        self.intruder = User.objects.create_user(username="intruder", email="intruder@gov.in", password="password")
+        self.client_author = APIClient()
+        self.client_author.force_authenticate(self.author)
+        self.client_intruder = APIClient()
+        self.client_intruder.force_authenticate(self.intruder)
+
+    def test_studio_workflow_and_idor_protection(self):
+        policy_text = (
+            "Section 1. Microdata Security Standards:\n"
+            "Field enumerators must retain encrypted records on secure tablets.\n"
+            "All national sample statistical collections must maintain a minimum confidence interval of 95 percent.\n"
+            "Automated anomaly detection must flag duplicate household records within 24 hours of submission.\n"
+            "Data dissemination must undergo k-anonymity and differential privacy noise addition."
+        )
+
+        # 1. Author uploads document
+        up_res = self.client_author.post("/api/assessment/documents/", {
+            "title": "MoSPI Microdata Standards",
+            "text": policy_text
+        }, format="json")
+        self.assertEqual(up_res.status_code, 201)
+        doc_id = up_res.data["document_id"]
+
+        # 2. Intruder attempts IDOR to generate quiz from Author's document
+        intruder_gen = self.client_intruder.post("/api/assessment/studio/generate/", {
+            "document_id": doc_id,
+            "num_questions": 2
+        }, format="json")
+        self.assertEqual(intruder_gen.status_code, 404)
+
+        # 3. Author generates draft quiz
+        gen_res = self.client_author.post("/api/assessment/studio/generate/", {
+            "document_id": doc_id,
+            "title": "MoSPI Security Knowledge Check",
+            "num_questions": 2,
+            "difficulty": "Intermediate"
+        }, format="json")
+        self.assertEqual(gen_res.status_code, 201)
+        quiz_id = gen_res.data["quiz_id"]
+        self.assertEqual(gen_res.data["status"], "DRAFT")
+        self.assertEqual(len(gen_res.data["questions"]), 2)
+
+        # 4. Draft quiz is NOT discoverable in public/learner catalog
+        cat_res = self.client_author.get("/api/assessment/checks/")
+        self.assertEqual(cat_res.status_code, 200)
+        self.assertFalse(any(c["id"] == quiz_id for c in cat_res.data["checks"]))
+
+        # 5. Intruder attempts to edit author's quiz (IDOR)
+        intruder_edit = self.client_intruder.patch(f"/api/assessment/studio/{quiz_id}/", {
+            "title": "Hacked Title"
+        }, format="json")
+        self.assertEqual(intruder_edit.status_code, 403)
+
+        # 6. Author adds a manual question
+        add_res = self.client_author.post(f"/api/assessment/studio/{quiz_id}/questions/", {
+            "action": "add",
+            "question_text": "What is the mandatory threshold for household record duplicate checks?",
+            "question_type": "MCQ",
+            "source_page": 1,
+            "source_section": "Section 1",
+            "evidence_text": "Automated anomaly detection must flag duplicate household records within 24 hours.",
+            "explanation": "Official guidelines mandate automated flagging within 24 hours.",
+            "options": [
+                {"text": "Within 24 hours", "is_correct": True},
+                {"text": "Within 30 days", "is_correct": False},
+                {"text": "At annual audit", "is_correct": False}
+            ]
+        }, format="json")
+        self.assertEqual(add_res.status_code, 201)
+
+        # 7. Author publishes the Knowledge Check
+        pub_res = self.client_author.post(f"/api/assessment/studio/{quiz_id}/publish/")
+        self.assertEqual(pub_res.status_code, 200)
+        self.assertEqual(pub_res.data["status"], "PUBLISHED")
+
+        # 8. Now published check is visible in catalog
+        cat_pub_res = self.client_author.get("/api/assessment/checks/")
+        self.assertTrue(any(c["id"] == quiz_id for c in cat_pub_res.data["checks"]))
+
+        # 9. Learner takes published check and receives source-backed feedback
+        detail_res = self.client_intruder.get(f"/api/assessment/checks/{quiz_id}/")
+        self.assertEqual(detail_res.status_code, 200)
+        q_list = detail_res.data["questions"]
+        self.assertTrue(len(q_list) >= 3)
+
+        # Build answers: pick first option for each
+        answers = {str(q["id"]): q["options"][0]["id"] for q in q_list}
+        sub_res = self.client_intruder.post(f"/api/assessment/checks/{quiz_id}/submit/", {
+            "answers": answers
+        }, format="json")
+        self.assertEqual(sub_res.status_code, 200)
+        self.assertIn("score_percentage", sub_res.data)
+        self.assertIn("detailed_results", sub_res.data)
+        self.assertIn("what_you_did_well", sub_res.data)
+        self.assertIn("keep_practising", sub_res.data)
+        # Check source page in result
+        self.assertEqual(sub_res.data["detailed_results"][0]["source_page"], 1)
