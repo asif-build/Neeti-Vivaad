@@ -72,7 +72,7 @@ class BuddyService:
         # What should I do next / start
         if any(w in msg for w in ['next', 'what should i do', 'start', 'begin', 'first']):
             if not user.get('profile_complete', False):
-                return {'label': 'Upload Resume →', 'route': '/candidate/onboarding'}
+                return {'label': 'Upload Resume →', 'route': '/profile/setup'}
             elif context.get('recommended_courses'):
                 return {'label': 'View Courses →', 'route': '/courses'}
             else:
@@ -80,7 +80,7 @@ class BuddyService:
 
         # Resume / Profile
         if any(w in msg for w in ['resume', 'upload', 'cv']):
-            return {'label': 'Open Your Profile →', 'route': '/candidate/onboarding'}
+            return {'label': 'Open Your Profile →', 'route': '/profile/setup'}
 
         # Profile / Who am I
         if any(w in msg for w in ['profile', 'who am i', 'my profile']):

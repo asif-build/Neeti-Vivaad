@@ -11,7 +11,7 @@ from django.core.paginator import Paginator, EmptyPage
 from django.utils import timezone
 from django.conf import settings
 from .models import Course
-from core.models import CompetencyDomain
+from core.models import CompetencyDomain, SubSkill
 
 logger = logging.getLogger(__name__)
 
@@ -298,6 +298,45 @@ class IGOTCourseProvider(CourseProvider):
                     course.last_synced_at = now
                     course.save()
                     updated_count += 1
+
+            # Map target SubSkills based on category & title/description text
+            text_combo = f"{title} {description}".lower()
+            matched_subskills = []
+            
+            # 1. Statistical Methodology
+            if any(w in text_combo for w in ['sample', 'sampling', 'estimation', 'survey design', 'indicator', 'statistic']):
+                matched_subskills.append('STAT-01')
+            if any(w in text_combo for w in ['high-frequency', 'field survey', 'survey data', 'nss', 'household', 'census']):
+                matched_subskills.append('STAT-02')
+            if any(w in text_combo for w in ['anomaly', 'outlier', 'quality control', 'scrutiny', 'data validation', 'verification']):
+                matched_subskills.append('STAT-03')
+                
+            # 2. Technical Tools
+            if any(w in text_combo for w in ['sql', 'database', 'wrangling', 'mysql', 'query', 'relational']):
+                matched_subskills.append('TECH-01')
+            if any(w in text_combo for w in ['python', 'r program', 'modeling', 'machine learning', 'predictive', 'algorithm', 'code']):
+                matched_subskills.append('TECH-02')
+            if any(w in text_combo for w in ['capi', 'mobile survey', 'digital data collection', 'tablet', 'portal', 'app']):
+                matched_subskills.append('TECH-03')
+
+            # 3. Digital Governance
+            if any(w in text_combo for w in ['ndsap', 'open data', 'data sharing', 'interoperability', 'governance', 'dpdp']):
+                matched_subskills.append('GOV-01')
+            if any(w in text_combo for w in ['privacy', 'anonymity', 'cyber', 'security', 'information security', 'protection']):
+                matched_subskills.append('GOV-02')
+
+            # 4. Behavioural & Decision Making
+            if any(w in text_combo for w in ['policy', 'decision', 'trade-off', 'fallac', 'reasoning', 'evidence-based', 'analysis']):
+                matched_subskills.append('BEH-01')
+            if any(w in text_combo for w in ['leadership', 'ethics', 'integrity', 'team', 'management', 'conduct', 'supervis']):
+                matched_subskills.append('BEH-02')
+
+            if matched_subskills:
+                subs = SubSkill.objects.filter(code__in=matched_subskills)
+                course.target_subskills.set(subs)
+                if subs.exists() and not course.domain:
+                    course.domain = subs.first().domain
+                    course.save(update_fields=['domain'])
 
         # Mark removed records as inactive
         Course.objects.filter(source="igot").exclude(igot_course_id__in=active_ids).update(status="inactive")

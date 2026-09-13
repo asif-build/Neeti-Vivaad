@@ -51,3 +51,32 @@ class Course(models.Model):
         return f"{self.title} ({self.provider})"
 
 
+class IGOTCourseEnrollment(models.Model):
+    """Tracks user interaction, learning status and authorized completion sync from iGOT Karmayogi."""
+    class Status(models.TextChoices):
+        ENROLLED = 'ENROLLED', 'Enrolled'
+        IN_PROGRESS = 'IN_PROGRESS', 'In Progress'
+        COMPLETED = 'COMPLETED', 'Completed'
+
+    user = models.ForeignKey('core.User', on_delete=models.CASCADE, related_name='igot_enrollments')
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='enrollments')
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.IN_PROGRESS, db_index=True)
+    progress_percentage = models.FloatField(default=0.0)
+    enrolled_at = models.DateTimeField(default=timezone.now)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    last_synced_at = models.DateTimeField(default=timezone.now)
+    certificate_id = models.CharField(max_length=150, blank=True, default='')
+    skills_credited = models.JSONField(default=list, blank=True)
+    proficiency_boost = models.FloatField(default=12.0)
+
+    class Meta:
+        unique_together = ('user', 'course')
+        indexes = [
+            models.Index(fields=['user', 'status']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.course.title} [{self.status}]"
+
+
+

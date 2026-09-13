@@ -4,9 +4,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BookOpen, Search, ExternalLink, Eye, X, 
   CheckCircle2, Clock, Building, ChevronLeft, ChevronRight, 
-  RefreshCcw, Sparkles, AlertCircle, Layers
+  RefreshCcw, Sparkles, AlertCircle, Layers, Check, Loader2
 } from 'lucide-react';
-import { getApiBaseUrl } from '../utils/api';
+import { getApiBaseUrl, authFetch, getAccessToken } from '../utils/api';
 import { CourseThumbnail } from './CourseThumbnail';
 
 export default function CourseCatalog() {
@@ -30,6 +30,88 @@ export default function CourseCatalog() {
 
   // Course Preview Modal State
   const [previewCourse, setPreviewCourse] = useState<any | null>(null);
+
+  // User Enrollment & iGOT Sync State
+  const [userEnrollments, setUserEnrollments] = useState<Record<string, any>>({});
+  const [syncingCourseId, setSyncingCourseId] = useState<string | null>(null);
+  const [syncFeedback, setSyncFeedback] = useState<{ courseId: string; message: string; skills: any[] } | null>(null);
+
+  // Fetch user enrollments if authenticated
+  const fetchEnrollments = useCallback(async () => {
+    const token = getAccessToken();
+    if (!token) return;
+    try {
+      const res = await authFetch('/api/courses/enrollments/');
+      if (res.ok) {
+        const data = await res.json();
+        const map: Record<string, any> = {};
+        (data.enrollments || []).forEach((e: any) => {
+          map[e.igot_course_id || e.course_id] = e;
+        });
+        setUserEnrollments(map);
+      }
+    } catch (err) {
+      console.warn('[Courses] Unable to fetch user enrollments:', err);
+    }
+  }, []);
+
+  // Handle clicking "COMPLETE ON iGOT →"
+  const handleStartOnIgot = async (course: any) => {
+    const targetUrl = course.igot_course_url || course.url;
+    if (targetUrl) {
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    }
+
+    const token = getAccessToken();
+    if (token) {
+      try {
+        const cId = course.igot_course_id || course.id;
+        const res = await authFetch(`/api/courses/${cId}/start/`, { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          setUserEnrollments(prev => ({
+            ...prev,
+            [cId]: { status: data.status, progress_percentage: 25.0 }
+          }));
+        }
+      } catch (e) {
+        console.warn('[Courses] Could not register start action:', e);
+      }
+    }
+  };
+
+  // Handle clicking "Sync iGOT Completion"
+  const handleSyncCompletion = async (course: any) => {
+    const token = getAccessToken();
+    if (!token) {
+      window.location.href = '/login';
+      return;
+    }
+
+    const cId = course.igot_course_id || course.id;
+    setSyncingCourseId(cId);
+    setSyncFeedback(null);
+
+    try {
+      const res = await authFetch(`/api/courses/${cId}/sync/`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setUserEnrollments(prev => ({
+          ...prev,
+          [cId]: { status: 'COMPLETED', progress_percentage: 100.0, certificate_id: data.certificate_id }
+        }));
+        setSyncFeedback({
+          courseId: cId,
+          message: data.message,
+          skills: data.skills_credited || []
+        });
+      }
+    } catch (err) {
+      console.error('[Courses] Error syncing completion:', err);
+    } finally {
+      setSyncingCourseId(null);
+    }
+  };
 
   // Fetch real iGOT courses from backend
   const fetchCourses = useCallback(async (
@@ -69,7 +151,8 @@ export default function CourseCatalog() {
 
   useEffect(() => {
     fetchCourses(1, '', 'ALL');
-  }, [fetchCourses]);
+    fetchEnrollments();
+  }, [fetchCourses, fetchEnrollments]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,6 +200,41 @@ export default function CourseCatalog() {
           </div>
         </div>
       </div>
+
+      {/* Synchronized Completion Notification */}
+      {syncFeedback && (
+        <div className="card-brutal bg-emerald-50 border-2 border-emerald-700 p-4 sm:p-5 shadow-brutal flex items-start justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+              <Check className="w-5 h-5 stroke-[3]" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="font-display font-extrabold uppercase text-sm text-emerald-950">
+                Course Completed on iGOT Karmayogi!
+              </h4>
+              <p className="text-xs text-emerald-800 font-medium">
+                {syncFeedback.message}
+              </p>
+              {syncFeedback.skills.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {syncFeedback.skills.map((s, idx) => (
+                    <span key={idx} className="text-[11px] font-mono px-2 py-0.5 bg-white rounded border border-emerald-300 text-emerald-900 font-semibold">
+                      +{s.boost} pts &rarr; {s.subskill} ({s.new_score}%)
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSyncFeedback(null)}
+            className="text-emerald-800 hover:text-emerald-950 p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Filter & Search Controls */}
       <div className="card-brutal bg-white p-4 sm:p-5 flex flex-col md:flex-row items-center justify-between gap-4 shadow-brutal-md">
@@ -214,6 +332,9 @@ export default function CourseCatalog() {
               ? course.topics 
               : (course.competencies || []);
             const igotUrl = course.igot_course_url || course.url;
+            const courseKey = course.igot_course_id || course.id;
+            const enrollment = userEnrollments[courseKey] || userEnrollments[course.id] || userEnrollments[course.igot_course_id];
+            const isCompleted = enrollment?.status === 'COMPLETED';
 
             return (
               <div 
@@ -292,33 +413,69 @@ export default function CourseCatalog() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewCourse(course)}
-                        className="btn-brutal-secondary !text-xs !py-2.5 !px-3 flex items-center justify-center gap-1.5 text-center font-bold"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>VIEW COURSE</span>
-                      </button>
-
-                      {igotUrl ? (
-                        <a
-                          href={igotUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="btn-brutal-emerald !text-xs !py-2.5 !px-3 flex items-center justify-center gap-1.5 text-center font-bold"
-                        >
-                          <span>VIEW ON iGOT →</span>
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
+                    {/* Course Card Action Buttons */}
+                    <div className="space-y-2">
+                      {isCompleted ? (
+                        <div className="p-2.5 rounded-xl bg-emerald-50 border-2 border-emerald-600 flex items-center justify-between">
+                          <span className="text-xs font-mono font-bold text-emerald-800 flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-emerald-700 stroke-[3]" />
+                            <span>COMPLETED ON iGOT ✓</span>
+                          </span>
+                          <span className="text-[10px] font-mono text-emerald-700 font-semibold">
+                            +15 PTS CREDITED
+                          </span>
+                        </div>
                       ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewCourse(course)}
+                            className="btn-brutal-secondary !text-xs !py-2.5 !px-3 flex items-center justify-center gap-1.5 text-center font-bold"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>DETAILS</span>
+                          </button>
+
+                          {igotUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => handleStartOnIgot(course)}
+                              className="btn-brutal-primary !text-xs !py-2.5 !px-3 flex items-center justify-center gap-1.5 text-center font-bold shadow-brutal-sm"
+                            >
+                              <span>COMPLETE ON iGOT →</span>
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled
+                              className="px-3 py-2.5 rounded-xl border-2 border-zinc-300 text-xs font-mono font-bold text-zinc-400 bg-zinc-100 cursor-not-allowed text-center"
+                            >
+                              Link Unavailable
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Authorized iGOT Sync Button if In Progress */}
+                      {enrollment && enrollment.status !== 'COMPLETED' && (
                         <button
                           type="button"
-                          disabled
-                          className="px-3 py-2.5 rounded-xl border-2 border-zinc-300 text-xs font-mono font-bold text-zinc-400 bg-zinc-100 cursor-not-allowed text-center"
+                          disabled={syncingCourseId === (course.igot_course_id || course.id)}
+                          onClick={() => handleSyncCompletion(course)}
+                          className="w-full btn-brutal-emerald !text-xs !py-2 flex items-center justify-center gap-2 font-bold shadow-brutal-sm"
                         >
-                          Link Unavailable
+                          {syncingCourseId === (course.igot_course_id || course.id) ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Syncing with iGOT Karmayogi...</span>
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCcw className="w-3.5 h-3.5" />
+                              <span>SYNC iGOT COMPLETION</span>
+                            </>
+                          )}
                         </button>
                       )}
                     </div>
@@ -366,7 +523,12 @@ export default function CourseCatalog() {
       )}
 
       {/* Course Details / Preview Modal */}
-      {previewCourse && (
+      {previewCourse && (() => {
+        const previewCourseKey = previewCourse.igot_course_id || previewCourse.id;
+        const previewEnrollment = userEnrollments[previewCourseKey] || userEnrollments[previewCourse.id] || userEnrollments[previewCourse.igot_course_id];
+        const previewCourseIsCompleted = previewEnrollment?.status === 'COMPLETED';
+
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
           <div 
             className="fixed inset-0 bg-[#0B1F3A]/70 backdrop-blur-sm transition-opacity"
@@ -495,31 +657,61 @@ export default function CourseCatalog() {
                     Close
                   </button>
 
-                  {(previewCourse.igot_course_url || previewCourse.url) ? (
-                    <a
-                      href={previewCourse.igot_course_url || previewCourse.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-full sm:w-auto btn-brutal-emerald !text-xs !py-3 !px-6 flex items-center justify-center gap-2 shadow-brutal-sm font-bold"
-                    >
-                      <span>VIEW ON iGOT →</span>
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled
-                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl border-2 border-zinc-300 text-xs font-mono font-bold text-zinc-400 bg-zinc-100 cursor-not-allowed"
-                    >
-                      Link Unavailable
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    {previewCourseIsCompleted ? (
+                      <div className="px-4 py-2.5 rounded-xl bg-emerald-100 border-2 border-emerald-700 text-emerald-950 font-mono text-xs font-bold flex items-center gap-2">
+                        <Check className="w-4 h-4 stroke-[3] text-emerald-700" />
+                        <span>COMPLETED ON iGOT ✓ (+15 PTS)</span>
+                      </div>
+                    ) : (
+                      <>
+                        {(previewCourse.igot_course_url || previewCourse.url) ? (
+                          <button
+                            type="button"
+                            onClick={() => handleStartOnIgot(previewCourse)}
+                            className="btn-brutal-primary !text-xs !py-3 !px-6 flex items-center justify-center gap-2 shadow-brutal-sm font-bold"
+                          >
+                            <span>COMPLETE ON iGOT →</span>
+                            <ExternalLink className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled
+                            className="px-5 py-2.5 rounded-xl border-2 border-zinc-300 text-xs font-mono font-bold text-zinc-400 bg-zinc-100 cursor-not-allowed"
+                          >
+                            Link Unavailable
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          disabled={syncingCourseId === (previewCourse.igot_course_id || previewCourse.id)}
+                          onClick={() => handleSyncCompletion(previewCourse)}
+                          className="btn-brutal-emerald !text-xs !py-3 !px-5 flex items-center justify-center gap-2 shadow-brutal-sm font-bold"
+                        >
+                          {syncingCourseId === (previewCourse.igot_course_id || previewCourse.id) ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Syncing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCcw className="w-3.5 h-3.5" />
+                              <span>SYNC COMPLETION</span>
+                            </>
+                          )}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
     </div>
   );

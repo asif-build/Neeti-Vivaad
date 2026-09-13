@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from core.models import User, CompetencyDomain, SubSkill, OfficialSkillProficiency
 from core.views import SkillGapAnalysisView, ProfileView
 from courses.views import RecommendedCoursesView
+from courses.models import IGOTCourseEnrollment
 from assessment.models import QuizAttempt, BaselineAssessmentAttempt
 from debate.models import DebateSession
 
@@ -44,6 +45,25 @@ class LearnerDashboardView(APIView):
                 'created_at': d.created_at.strftime('%Y-%m-%d %H:%M')
             })
 
+        enrollments = IGOTCourseEnrollment.objects.filter(user=user).select_related('course').order_by('-last_synced_at')
+        enrollments_data = []
+        for e in enrollments:
+            enrollments_data.append({
+                'id': e.id,
+                'course_id': e.course.id,
+                'igot_course_id': e.course.igot_course_id,
+                'title': e.course.title,
+                'provider': e.course.provider,
+                'thumbnail_url': e.course.thumbnail_url,
+                'igot_course_url': e.course.igot_course_url or e.course.url,
+                'category': e.course.category,
+                'status': e.status,
+                'progress_percentage': e.progress_percentage,
+                'completed_at': e.completed_at.strftime('%B %d, %Y') if e.completed_at else None,
+                'certificate_id': e.certificate_id,
+                'skills_credited': e.skills_credited
+            })
+
         return Response({
             'user': prof_res.data['user'],
             'profile_complete': user.profile_complete,
@@ -52,7 +72,9 @@ class LearnerDashboardView(APIView):
             'top_gaps': gap_res.data.get('top_gaps', []),
             'recommended_courses': rec_res.data.get('recommendations', [])[:4],
             'recent_quizzes': attempts_data,
-            'recent_debates': debates_data
+            'recent_debates': debates_data,
+            'igot_enrollments': enrollments_data,
+            'completed_courses_count': enrollments.filter(status=IGOTCourseEnrollment.Status.COMPLETED).count()
         })
 
 class AdminDashboardView(APIView):

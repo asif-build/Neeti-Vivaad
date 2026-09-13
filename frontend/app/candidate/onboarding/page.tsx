@@ -60,44 +60,7 @@ export default function OnboardingPage() {
   const [competencyResult, setCompetencyResult] = useState<any>(null);
 
   useEffect(() => {
-    const token = getAccessToken();
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    // Load initial user state
-    authFetch('/api/auth/me/')
-      .then(res => res.json())
-      .then(data => {
-        if (data.user) {
-          if (data.user.designation) {
-            setCurrentRole(data.user.designation);
-          }
-          if (data.user.official_profile) {
-            const prof = data.user.official_profile;
-            if (prof.current_role) setCurrentRole(prof.current_role);
-            if (prof.target_role) setTargetRole(prof.target_role);
-            if (prof.career_goal) setCareerGoal(prof.career_goal);
-            if (prof.confirmed_skills && prof.confirmed_skills.length > 0) {
-              setSkillsList(prof.confirmed_skills);
-            }
-            if (prof.onboarding_step && prof.onboarding_step > 1 && prof.onboarding_step <= 5) {
-              // resume where left off if not yet completed
-              if (!data.user.profile_complete) {
-                setStep(prof.onboarding_step as any);
-              }
-            }
-          }
-
-          if (data.user.profile_complete) {
-            router.push('/dashboard');
-          }
-        }
-      })
-      .catch(() => {
-        router.push('/login');
-      });
+    router.replace('/profile/setup');
   }, [router]);
 
   // -------------------------------------------------------------

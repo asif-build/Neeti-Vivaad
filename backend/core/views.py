@@ -318,24 +318,69 @@ class ProfileView(APIView):
         if mobile_number is not None: user.mobile_number = mobile_number
 
         # Update OfficialProfile
-        if 'designation' in request.data: profile.designation = request.data['designation']
+        if 'designation' in request.data:
+            profile.designation = request.data['designation']
+            profile.current_role = request.data['designation']
         if 'department' in request.data: profile.department = request.data['department']
         if 'organisation' in request.data: profile.organisation = request.data['organisation']
-        if 'experience_years' in request.data: profile.experience_years = float(request.data['experience_years'])
+        if 'experience_years' in request.data:
+            try:
+                profile.experience_years = float(request.data['experience_years'])
+            except (ValueError, TypeError):
+                pass
         if 'education' in request.data: profile.education = request.data['education']
-        if 'skills' in request.data: profile.skills = request.data['skills']
+        if 'certifications' in request.data: profile.certifications = request.data['certifications']
+        
+        # Handle skills and confirmed_skills
+        raw_skills = request.data.get('skills', [])
+        confirmed_skills = request.data.get('confirmed_skills', [])
+        
+        if confirmed_skills and isinstance(confirmed_skills, list):
+            profile.confirmed_skills = confirmed_skills
+            profile.skills = [s['skill'] if isinstance(s, dict) and 'skill' in s else str(s) for s in confirmed_skills]
+        elif raw_skills and isinstance(raw_skills, list):
+            profile.skills = [str(s).strip() for s in raw_skills if str(s).strip()]
+            profile.confirmed_skills = [
+                {
+                    'skill': s,
+                    'evidence': 'Confirmed by officer in profile review',
+                    'confidence': 0.88,
+                    'domain_type': 'STATISTICAL',
+                    'user_confirmed': True,
+                    'source': 'USER_EDIT'
+                }
+                for s in profile.skills
+            ]
+
         if 'training_history' in request.data: profile.training_history = request.data['training_history']
         if 'learning_preferences' in request.data: profile.learning_preferences = request.data['learning_preferences']
+        
+        profile.onboarding_step = 5
         profile.save()
 
-        if profile.designation and profile.department:
+        # Calculate competencies and mark complete
+        if profile.confirmed_skills:
+            try:
+                calculate_and_persist_competencies(
+                    user=user,
+                    confirmed_skills=profile.confirmed_skills,
+                    current_role=profile.designation or 'Statistical Officer',
+                    target_role=profile.designation or 'Senior Statistical Officer',
+                    experience_years=profile.experience_years,
+                    education=profile.education
+                )
+            except Exception as e:
+                print(f"[ProfileView] Error calculating competencies: {e}")
+
+        if profile.designation:
             user.profile_complete = True
         user.save()
 
         return Response({
             'message': 'Official Profile updated successfully',
             'user': UserSerializer(user).data,
-            'official_profile': OfficialProfileSerializer(profile).data
+            'official_profile': OfficialProfileSerializer(profile).data,
+            'profile_complete': user.profile_complete
         })
 
     def put(self, request):

@@ -9,7 +9,7 @@ import {
 import { 
   Award, AlertTriangle, BookOpen, Sparkles, 
   ArrowUpRight, TrendingUp, CheckCircle2, ArrowRight, UserCheck,
-  Shield, MessageSquare, Play, RefreshCcw, ExternalLink
+  Shield, MessageSquare, Play, RefreshCcw, ExternalLink, Check, Loader2
 } from 'lucide-react';
 import { authFetch, getAccessToken } from '../utils/api';
 
@@ -19,46 +19,81 @@ export default function LearnerDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
+
+  const fetchDashboard = () => {
+    setLoading(true);
+    setError(null);
+    authFetch('/api/dashboard/learner/')
+      .then(async res => {
+        if (res.status === 401 || res.status === 403) {
+          router.push('/login');
+          return;
+        }
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          const msg = errData.error || errData.message || `Server responded with ${res.status}: ${res.statusText}`;
+          console.error(`[Dashboard API Error] Status: ${res.status}, Endpoint: /api/dashboard/learner/, Message:`, msg);
+          throw new Error(msg);
+        }
+        return res.json();
+      })
+      .then(d => {
+        if (d) {
+          setData(d);
+        }
+      })
+      .catch(err => {
+        console.error('[Dashboard Error]:', err);
+        setError(err.message || 'Error loading dashboard.');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+
   useEffect(() => {
     const token = getAccessToken();
     if (!token) {
       router.push('/login');
       return;
     }
-
-    const fetchDashboard = () => {
-      setLoading(true);
-      setError(null);
-      authFetch('/api/dashboard/learner/')
-        .then(async res => {
-          if (res.status === 401 || res.status === 403) {
-            router.push('/login');
-            return;
-          }
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            const msg = errData.error || errData.message || `Server responded with ${res.status}: ${res.statusText}`;
-            console.error(`[Dashboard API Error] Status: ${res.status}, Endpoint: /api/dashboard/learner/, Message:`, msg);
-            throw new Error(msg);
-          }
-          return res.json();
-        })
-        .then(d => {
-          if (d) {
-            setData(d);
-          }
-        })
-        .catch(err => {
-          console.error('[Dashboard Error]:', err);
-          setError(err.message || 'Error loading dashboard.');
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    };
-
     fetchDashboard();
   }, [router]);
+
+  const handleStartOnIgot = async (course: any) => {
+    const targetUrl = course.igot_course_url || course.url;
+    if (targetUrl) {
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    }
+    const cId = course.igot_course_id || course.id;
+    try {
+      await authFetch(`/api/courses/${cId}/start/`, { method: 'POST' });
+      fetchDashboard();
+    } catch (e) {
+      console.warn('[Dashboard] Start action failed:', e);
+    }
+  };
+
+  const handleSyncCourse = async (course: any) => {
+    const cId = course.igot_course_id || course.id;
+    setSyncingId(cId);
+    setSyncNotice(null);
+    try {
+      const res = await authFetch(`/api/courses/${cId}/sync/`, { method: 'POST' });
+      if (res.ok) {
+        const d = await res.json();
+        setSyncNotice(d.message || 'Authorized iGOT sync completed successfully!');
+        // Reload dashboard data to recalculate domain radar, gaps and recommendations
+        fetchDashboard();
+      }
+    } catch (err) {
+      console.error('[Dashboard] Sync error:', err);
+    } finally {
+      setSyncingId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -107,8 +142,8 @@ export default function LearnerDashboard() {
   return (
     <div className="min-h-screen bg-[#F8F7F2] text-[#111111] py-8 sm:py-12 px-4 sm:px-8 max-w-[1360px] mx-auto space-y-10 font-sans">
       
-      {/* Onboarding / Baseline Required Alert if Incomplete */}
-      {(!profile_complete || !baseline_completed) && (
+      {/* Profile Setup Banner if Incomplete */}
+      {!profile_complete && (
         <div className="card-brutal bg-[#FEF3C7] border-2 border-[#111111] shadow-brutal flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 sm:p-6">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-amber-950 font-display font-extrabold text-base uppercase">
@@ -120,12 +155,37 @@ export default function LearnerDashboard() {
             </p>
           </div>
           <Link
-            href="/candidate/onboarding"
-            className="btn-brutal-primary shrink-0 !text-xs !py-2.5 !px-5"
+            href="/profile/setup"
+            className="btn-brutal-primary shrink-0 !text-xs !py-3 !px-6 flex items-center justify-center gap-2 font-bold cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5 shadow-brutal-sm"
           >
-            <span>Set Up Profile</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <span>SET UP PROFILE →</span>
           </Link>
+        </div>
+      )}
+
+      {/* iGOT Sync Success Banner */}
+      {syncNotice && (
+        <div className="card-brutal bg-emerald-50 border-2 border-emerald-700 p-4 sm:p-5 shadow-brutal flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+              <Check className="w-5 h-5 stroke-[3]" />
+            </div>
+            <div>
+              <h4 className="font-display font-extrabold uppercase text-sm text-emerald-950">
+                iGOT Learning Synchronized Successfully
+              </h4>
+              <p className="text-xs text-emerald-800 font-medium">
+                {syncNotice} Your skill proficiencies and course recommendations have been updated.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSyncNotice(null)}
+            className="text-xs font-mono text-emerald-800 font-bold hover:underline"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
@@ -363,17 +423,36 @@ export default function LearnerDashboard() {
 
                   <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 space-y-0.5">
                     <strong className="block font-bold">Why this course?</strong>
-                    <span>Builds key competencies needed for your department and role.</span>
+                    <span>{course.why_this_course || 'Builds key competencies needed for your department and role.'}</span>
                   </div>
                 </div>
 
-                <Link 
-                  href="/courses" 
-                  className="btn-brutal-emerald !text-xs !py-2.5 flex items-center justify-between"
-                >
-                  <span>View Course</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
+                <div className="space-y-2 pt-2 border-t border-zinc-200">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleStartOnIgot(course)}
+                      className="btn-brutal-primary !text-xs !py-2 flex items-center justify-center gap-1 font-bold shadow-brutal-sm"
+                    >
+                      <span>COMPLETE ON iGOT</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={syncingId === (course.igot_course_id || course.id)}
+                      onClick={() => handleSyncCourse(course)}
+                      className="btn-brutal-emerald !text-xs !py-2 flex items-center justify-center gap-1 font-bold shadow-brutal-sm"
+                    >
+                      {syncingId === (course.igot_course_id || course.id) ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <RefreshCcw className="w-3 h-3" />
+                      )}
+                      <span>SYNC</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             );
           })}

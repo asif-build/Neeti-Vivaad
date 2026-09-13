@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from core.models import User, OfficialSkillProficiency, RoleCompetencyRequirement
 from core.views import SkillGapAnalysisView
-from .models import Course
+from .models import Course, IGOTCourseEnrollment
 from .provider import IGOTCourseProvider
 from .recommendation import CourseRecommendationEngine
 
@@ -58,8 +58,14 @@ class RecommendedCoursesView(APIView):
             provider.sync_courses()
             courses = Course.objects.filter(status='active').prefetch_related('target_subskills', 'domain').all()
 
+        # Fetch courses already completed by this user
+        completed_ids = list(IGOTCourseEnrollment.objects.filter(
+            user=user,
+            status=IGOTCourseEnrollment.Status.COMPLETED
+        ).values_list('course_id', flat=True))
+
         engine = CourseRecommendationEngine(courses)
-        recommendations = engine.recommend_for_gaps(gap_data, top_k=6)
+        recommendations = engine.recommend_for_gaps(gap_data, completed_course_ids=completed_ids, top_k=6)
 
         recs_data = []
         for course, match_pct in recommendations:
