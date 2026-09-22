@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { VivaadTreeLogo } from '../components/Logo';
 import { Mail, CheckCircle2, ArrowRight, ArrowLeft, KeyRound } from 'lucide-react';
 import { getApiBaseUrl } from '../utils/api';
+import { executeRecaptcha } from '../utils/recaptcha';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -19,10 +20,11 @@ export default function ForgotPasswordPage() {
 
     try {
       const base = getApiBaseUrl();
+      const recaptcha_token = await executeRecaptcha('password_reset');
       const res = await fetch(`${base}/api/auth/password-reset/request/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email, recaptcha_token })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to request password reset.');

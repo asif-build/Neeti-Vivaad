@@ -240,7 +240,7 @@ export function MeliusLanding() {
           className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900/90 border border-zinc-800 text-xs font-mono text-cyan-400 mb-8 shadow-inner"
         >
           <PlainviewSunLogo className="w-4 h-4 text-cyan-400" />
-          <span>MoSPI SIH2026 · Problem Statement SIH26101</span>
+          <span>Evidence-Based Governance · Dynamic Policy Simulator</span>
         </motion.div>
 
         {/* Big Bold Hero Headline */}

@@ -106,6 +106,21 @@ class Question(models.Model):
     source_citation = models.TextField(help_text="Exact snippet or reference from uploaded document")
     explanation = models.TextField(help_text="Reasoning grounded in document")
     created_by_ai = models.BooleanField(default=True)
+    is_source_question = models.BooleanField(default=False, help_text="Preserved directly from the source training material")
+    validation_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('VALIDATED', 'Validated'),
+            ('PENDING_REVIEW', 'Pending Admin Review'),
+            ('REJECTED', 'Rejected')
+        ],
+        default='VALIDATED'
+    )
+    validation_notes = models.TextField(blank=True, default='')
+    provenance_metadata = models.JSONField(
+        default=dict,
+        help_text="Detailed audit trail: source_doc, page, section, chunk_id, evidence, competency, model, version"
+    )
     order = models.IntegerField(default=0)
 
     class Meta:
@@ -155,6 +170,8 @@ class QuizAnswer(models.Model):
     answer_text = models.TextField(blank=True, default='')
     is_correct = models.BooleanField(default=False)
     feedback = models.TextField(blank=True, default='')
+    misconception_tag = models.CharField(max_length=255, blank=True, default='', help_text="Concept confused or missed")
+    pedagogical_explanation = models.TextField(blank=True, default='', help_text="Diagnostic explanation teaching the underlying principle with example")
 
     def __str__(self):
         return f"Answer for Q{self.question_id} on Attempt {self.attempt_id} ({'Correct' if self.is_correct else 'Wrong'})"

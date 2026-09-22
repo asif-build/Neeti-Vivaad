@@ -126,6 +126,10 @@ class NeetiVivaadPhase2Tests(TestCase):
         self.assertIn('criteria_scores', decide_res.data['evaluation'])
         self.assertIn('evidence_use', decide_res.data['evaluation']['criteria_scores'])
         self.assertIn('tradeoffs_analysis', decide_res.data['evaluation'])
+        self.assertIn('what_you_considered', decide_res.data['evaluation'])
+        self.assertIn('areas_to_think_about', decide_res.data['evaluation'])
+        self.assertIn('criteria_feedback', decide_res.data['evaluation'])
+        self.assertIn('other_perspectives_reaction', decide_res.data['evaluation'])
 
         # Check competency score boost
         prof = OfficialSkillProficiency.objects.get(user=self.user, subskill=self.subskill)
@@ -135,6 +139,10 @@ class NeetiVivaadPhase2Tests(TestCase):
         result_res = self.client.get(f'/api/debate/sessions/{session_id}/result/')
         self.assertEqual(result_res.status_code, status.HTTP_200_OK)
         self.assertEqual(result_res.data['decision']['selected_option_label'], 'Phased API access with differential privacy masking')
+        self.assertIn('what_you_considered', result_res.data['evaluation'])
+        self.assertIn('areas_to_think_about', result_res.data['evaluation'])
+        self.assertIn('criteria_feedback', result_res.data['evaluation'])
+        self.assertIn('other_perspectives_reaction', result_res.data['evaluation'])
 
     def test_idor_protection(self):
         """Users cannot view or submit turns for other users' sessions."""

@@ -33,7 +33,7 @@ export class VoiceService {
     const voices = this.synth.getVoices();
     if (!voices || voices.length === 0) return;
 
-    // Prioritize natural Indian English, then standard English natural voices
+    // Prioritize natural Indian English, then Hindi, then natural English voices
     const indianVoice = voices.find(v => 
       v.lang === 'en-IN' || 
       v.name.toLowerCase().includes('india') || 
@@ -50,8 +50,29 @@ export class VoiceService {
     );
 
     const fallbackEn = voices.find(v => v.lang.startsWith('en'));
-
     this.preferredVoice = indianVoice || naturalEnVoice || fallbackEn || voices[0];
+  }
+
+  public getVoiceForLanguage(langCode?: string): SpeechSynthesisVoice | null {
+    if (!this.synth) return null;
+    const voices = this.synth.getVoices();
+    if (!voices || voices.length === 0) return this.preferredVoice;
+
+    if (!langCode) return this.preferredVoice || voices[0];
+
+    const target = langCode.toLowerCase();
+    const baseLang = target.split('-')[0];
+
+    // 1. Exact match (e.g. 'hi-IN', 'ta-IN', 'bn-IN')
+    const exactMatch = voices.find(v => v.lang.toLowerCase() === target);
+    if (exactMatch) return exactMatch;
+
+    // 2. Base match (e.g. starts with 'hi', 'ta', 'bn')
+    const baseMatch = voices.find(v => v.lang.toLowerCase().startsWith(baseLang));
+    if (baseMatch) return baseMatch;
+
+    // 3. Fall back to preferred default
+    return this.preferredVoice || voices[0];
   }
 
   public hasSpeechSynthesis(): boolean {
@@ -79,7 +100,8 @@ export class VoiceService {
     text: string,
     onStart?: () => void,
     onEnd?: () => void,
-    onError?: (err: any) => void
+    onError?: (err: any) => void,
+    langCode?: string
   ): void {
     if (!this.synth || !this.hasSpeechSynthesis()) {
       if (onError) onError(new Error("Speech synthesis not supported in this browser."));
@@ -102,11 +124,15 @@ export class VoiceService {
     }
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
-    if (this.preferredVoice) {
-      utterance.voice = this.preferredVoice;
+    const selectedVoice = this.getVoiceForLanguage(langCode);
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
+    if (langCode) {
+      utterance.lang = langCode;
     }
     utterance.rate = 1.0;
-    utterance.pitch = 1.05; // Slightly warm and approachable tone
+    utterance.pitch = 1.05; // Warm and approachable tone
 
     utterance.onstart = () => {
       this.speakingState = true;
@@ -167,7 +193,8 @@ export class VoiceService {
   public startListening(
     onResult: (transcript: string) => void,
     onError: (err: string) => void,
-    onEnd?: () => void
+    onEnd?: () => void,
+    langCode?: string
   ): void {
     if (!this.hasSpeechRecognition()) {
       onError("Voice isn't available right now. You can type your question instead.");
@@ -182,7 +209,7 @@ export class VoiceService {
       this.recognition = new SpeechRec();
       this.recognition.continuous = false;
       this.recognition.interimResults = false;
-      this.recognition.lang = 'en-IN'; // Indian English default
+      this.recognition.lang = langCode || 'en-IN'; // Indian English default or user selected
 
       this.recognition.onstart = () => {
         this.listeningState = true;
@@ -201,11 +228,11 @@ export class VoiceService {
       this.recognition.onerror = (event: any) => {
         this.listeningState = false;
         if (event.error === 'not-allowed') {
-          onError("No problem. You can type your question instead.");
+          onError("Microphone access is needed for voice. You can type your question instead.");
         } else if (event.error === 'no-speech') {
-          onError("I couldn't hear that. Please try again.");
+          onError("I couldn't hear that. Please tap again to retry.");
         } else {
-          onError("I couldn't catch that. Please type your question instead.");
+          onError("I couldn't catch that. Please try again or type your question.");
         }
       };
 

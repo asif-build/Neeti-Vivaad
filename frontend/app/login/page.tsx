@@ -4,8 +4,10 @@ import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Logo } from '../components/Logo';
-import { Lock, Mail, Building, User, ArrowRight, Briefcase, KeyRound, AlertCircle, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
+import { Lock, Mail, Building, User, ArrowRight, Briefcase, KeyRound, AlertCircle, CheckCircle2, ShieldCheck, Sparkles, Eye, EyeOff } from 'lucide-react';
 import { setTokens, setSavedUser, getApiBaseUrl } from '../utils/api';
+import { getRecaptchaToken } from '../utils/recaptcha';
+import { PasswordStrengthMeter, calculatePasswordStrength } from '../components/PasswordStrengthMeter';
 
 function LoginContent() {
   const router = useRouter();
@@ -21,6 +23,9 @@ function LoginContent() {
   // Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [dept, setDept] = useState('');
@@ -29,17 +34,39 @@ function LoginContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
     setUnverifiedEmail(null);
+
+    if (mode === 'signup') {
+      if (password.length < 12) {
+        setError("Password must be at least 12 characters long.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords do not match. Please re-enter your password.");
+        return;
+      }
+      const strength = calculatePasswordStrength(password, { firstName, lastName, email });
+      if (strength.isCommon) {
+        setError("This password is too common or easily guessable. Please choose a stronger phrase.");
+        return;
+      }
+      if (strength.isSimilarToPersonalInfo) {
+        setError(`Password contains your ${strength.similarItems.join(' or ')}. Please avoid using personal information.`);
+        return;
+      }
+    }
+
+    setLoading(true);
 
     try {
       const base = getApiBaseUrl();
       if (mode === 'signin') {
+        const recaptcha_token = await getRecaptchaToken('login');
         const res = await fetch(`${base}/api/auth/login/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ email, password, recaptcha_token })
         });
 
         const data = await res.json();
@@ -69,6 +96,7 @@ function LoginContent() {
         }
       } else {
         // Sign up
+        const recaptcha_token = await getRecaptchaToken('register');
         const username = email.split('@')[0] + Math.floor(Math.random() * 1000);
         const res = await fetch(`${base}/api/auth/register/`, {
           method: 'POST',
@@ -81,7 +109,8 @@ function LoginContent() {
             last_name: lastName,
             department: dept,
             designation: designation,
-            phone_number: mobileNumber
+            phone_number: mobileNumber,
+            recaptcha_token
           })
         });
 
@@ -105,20 +134,7 @@ function LoginContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F7F2] text-[#111111] flex flex-col justify-center items-center px-4 py-12 font-sans relative overflow-hidden">
-      
-      {/* Background Graphic Grid Pattern */}
-      <div 
-        className="absolute inset-0 pointer-events-none opacity-20"
-        style={{
-          backgroundImage: `
-            linear-gradient(to right, #111111 1px, transparent 1px),
-            linear-gradient(to bottom, #111111 1px, transparent 1px)
-          `,
-          backgroundSize: '36px 36px'
-        }}
-      />
-
+    <div className="min-h-screen bg-white text-[#111111] flex flex-col justify-center items-center px-4 py-12 font-sans relative overflow-hidden">
       <div className="w-full max-w-md relative z-10 space-y-6">
         
         {/* Brand Header */}
@@ -284,24 +300,82 @@ function LoginContent() {
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-mono font-bold uppercase text-[#111111]">Password *</label>
-                {mode === 'signin' && (
+                {mode === 'signin' ? (
                   <Link href="/forgot-password" className="text-[11px] font-mono text-[#0F766E] font-bold hover:underline">
                     Forgot password?
                   </Link>
+                ) : (
+                  <span className="text-[10px] font-mono text-zinc-500 font-medium">Min 12 characters</span>
                 )}
               </div>
               <div className="relative">
                 <Lock className="w-4 h-4 text-[#111111] absolute left-3 top-3" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
-                  placeholder="••••••••••••"
-                  className="w-full pl-9 pr-3 py-2 rounded-xl border-2 border-[#111111] text-xs font-mono text-[#111111] font-medium placeholder:text-[#4B5563] bg-[#F8F7F2] focus:bg-white focus:outline-none shadow-brutal-sm"
+                  minLength={mode === 'signup' ? 12 : undefined}
+                  placeholder={mode === 'signup' ? 'At least 12 characters' : '••••••••••••'}
+                  className="w-full pl-9 pr-10 py-2 rounded-xl border-2 border-[#111111] text-xs font-mono text-[#111111] font-medium placeholder:text-[#4B5563] bg-[#F8F7F2] focus:bg-white focus:outline-none shadow-brutal-sm"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-zinc-600 hover:text-[#111111] p-0.5 focus:outline-none"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
+
+              {/* Password strength meter in signup mode */}
+              {mode === 'signup' && (
+                <PasswordStrengthMeter password={password} personalInfo={{ firstName, lastName, email }} />
+              )}
             </div>
+
+            {/* Confirm password field in signup mode */}
+            {mode === 'signup' && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-mono font-bold uppercase text-[#111111]">Confirm Password *</label>
+                  {confirmPassword && (
+                    <span className={`text-[10px] font-mono font-bold flex items-center gap-1 ${
+                      password === confirmPassword ? 'text-emerald-700' : 'text-rose-600'
+                    }`}>
+                      {password === confirmPassword ? (
+                        <><CheckCircle2 className="w-3 h-3" /> Match</>
+                      ) : (
+                        <><AlertCircle className="w-3 h-3" /> Mismatch</>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-[#111111] absolute left-3 top-3" />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={12}
+                    placeholder="Re-enter your password"
+                    className={`w-full pl-9 pr-10 py-2 rounded-xl border-2 text-xs font-mono font-medium placeholder:text-[#4B5563] bg-[#F8F7F2] focus:bg-white focus:outline-none shadow-brutal-sm ${
+                      confirmPassword && password !== confirmPassword ? 'border-rose-500' : 'border-[#111111]'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-2.5 text-zinc-600 hover:text-[#111111] p-0.5 focus:outline-none"
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"
@@ -311,6 +385,12 @@ function LoginContent() {
               <span>{loading ? 'Processing...' : (mode === 'signin' ? 'Sign In to Neeti Saarthi' : 'Create Official Account')}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
+
+            <p className="text-[10px] font-mono text-[#4B5563] text-center pt-2">
+              By continuing, you acknowledge our{' '}
+              <Link href="/terms" className="underline text-[#111111] hover:text-[#0F766E] font-bold">Terms</Link> and{' '}
+              <Link href="/privacy-policy" className="underline text-[#111111] hover:text-[#0F766E] font-bold">Privacy Policy</Link>.
+            </p>
 
           </form>
 

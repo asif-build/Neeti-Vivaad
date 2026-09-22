@@ -1,4 +1,5 @@
 import os
+import re
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -6,6 +7,8 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from core.models import User, OfficialSkillProficiency, SubSkill
+from core.throttling import VivaadScenarioGenThrottle, VivaadDecisionThrottle, ResumeUploadThrottle
+from core.recaptcha import verify_recaptcha
 from assessment.extraction import process_document_source, DocumentExtractionError
 from .models import (
     DebateScenario, DebateSession, DebateRound, AgentArgument, DecisionReport, FallacyChallenge,
@@ -26,6 +29,7 @@ class VivaadSourceUploadView(APIView):
     Extracts text, preserves page and heading provenance, creates structured chunks.
     """
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ResumeUploadThrottle]
 
     def post(self, request):
         user = request.user
@@ -41,10 +45,29 @@ class VivaadSourceUploadView(APIView):
 
         try:
             if file_obj:
-                filename = file_obj.name
+                if file_obj.size > 15 * 1024 * 1024:
+                    return Response({'error': "File size exceeds 15MB limit. Please upload a smaller document."}, status=status.HTTP_400_BAD_REQUEST)
+
+                # Sanitize filename
+                safe_basename = os.path.basename(file_obj.name)
+                clean_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', safe_basename)
+                file_obj.name = clean_filename
+                filename = clean_filename
+
+                ext = os.path.splitext(filename)[1].lower()
+                if ext not in ['.pdf', '.docx', '.doc', '.txt']:
+                    return Response({'error': f"Unsupported file type '{ext}'. Please upload a PDF, DOCX, or TXT document."}, status=status.HTTP_400_BAD_REQUEST)
+
                 file_bytes = file_obj.read()
                 if len(file_bytes) == 0:
                     return Response({'error': "Uploaded file is empty."}, status=status.HTTP_400_BAD_REQUEST)
+
+                # Magic byte check
+                if ext == '.pdf' and not file_bytes[:4] == b'%PDF':
+                    return Response({'error': 'Uploaded file is not a valid PDF document.'}, status=status.HTTP_400_BAD_REQUEST)
+                elif ext == '.docx' and not file_bytes[:4] == b'PK\x03\x04':
+                    return Response({'error': 'Uploaded file is not a valid DOCX document.'}, status=status.HTTP_400_BAD_REQUEST)
+
                 extracted_data = process_document_source(file_bytes, filename)
             else:
                 filename = "Custom Policy Reference.txt"
@@ -90,8 +113,13 @@ class VivaadScenarioGenerateView(APIView):
     Supports Option A (from source document) and Option B (from creator custom text).
     """
     permission_classes = [IsAuthenticated]
+    throttle_classes = [VivaadScenarioGenThrottle]
 
     def post(self, request):
+        captcha_valid, captcha_error = verify_recaptcha(request, expected_action='vivaad_scenario_gen')
+        if not captcha_valid:
+            return Response({'error': captcha_error}, status=status.HTTP_400_BAD_REQUEST)
+
         user = request.user
         source_id = request.data.get('source_id')
         title = request.data.get('title', '').strip()
@@ -557,6 +585,27 @@ class VivaadScenarioDetailView(APIView):
             for p in perspectives
         ]
 
+        source_data = None
+        if scenario.source:
+            source_data = {
+                'id': scenario.source.id,
+                'title': scenario.source.title,
+                'filename': scenario.source.filename,
+                'file_type': scenario.source.file_type,
+                'page_count': scenario.source.page_count,
+                'file_size': scenario.source.file_size,
+                'chunks': [
+                    {
+                        'chunk_id': c.get('chunk_id', idx + 1),
+                        'page_number': c.get('page_number', 1),
+                        'section_title': c.get('section_title') or c.get('heading', f"Page {c.get('page_number', 1)}"),
+                        'text': c.get('text', '')
+                    }
+                    for idx, c in enumerate(scenario.source.chunks)
+                ],
+                'preview': scenario.source.extracted_text[:600]
+            }
+
         return Response({
             'id': scenario.id,
             'title': scenario.title,
@@ -565,6 +614,7 @@ class VivaadScenarioDetailView(APIView):
             'difficulty': scenario.difficulty,
             'source_type': scenario.source_type,
             'source_label': scenario.get_source_type_display(),
+            'source': source_data,
             'situation': scenario.situation,
             'decision_question': scenario.decision_question,
             'objective': scenario.objective,
@@ -583,6 +633,10 @@ class VivaadSessionStartView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        captcha_valid, captcha_error = verify_recaptcha(request, expected_action='start_vivaad')
+        if not captcha_valid:
+            return Response({'error': captcha_error}, status=status.HTTP_400_BAD_REQUEST)
+
         user = request.user
         scenario_id = request.data.get('scenario_id')
 
@@ -686,8 +740,13 @@ class VivaadSessionDecideView(APIView):
     Updates official competency progress with audit provenance.
     """
     permission_classes = [IsAuthenticated]
+    throttle_classes = [VivaadDecisionThrottle]
 
     def post(self, request, session_id):
+        captcha_valid, captcha_error = verify_recaptcha(request, expected_action='submit_vivaad_decision')
+        if not captcha_valid:
+            return Response({'error': captcha_error}, status=status.HTTP_400_BAD_REQUEST)
+
         user = request.user
         option_id = request.data.get('selected_option_id', '').strip()
         option_label = request.data.get('selected_option_label', '').strip()
@@ -718,6 +777,8 @@ class VivaadSessionDecideView(APIView):
         decision.reasoning = reasoning
         decision.save()
 
+        language = request.data.get('language', 'en')
+
         # Multi-criteria evaluation
         engine = get_vivaad_engine()
         all_turns = list(session.turns.all())
@@ -725,7 +786,8 @@ class VivaadSessionDecideView(APIView):
             scenario=session.scenario,
             selected_option_label=option_label,
             reasoning=reasoning,
-            turns=all_turns
+            turns=all_turns,
+            language=language
         )
 
         # Create or update Evaluation record
@@ -782,7 +844,14 @@ class VivaadSessionDecideView(APIView):
             },
             'evaluation': {
                 'overall_score': evaluation.overall_score,
+                'makes_sense_because': eval_result.get('makes_sense_because', ''),
+                'think_about_this_too': eval_result.get('think_about_this_too', []),
+                'another_view': eval_result.get('another_view', ''),
                 'criteria_scores': evaluation.criteria_scores,
+                'criteria_feedback': eval_result.get('criteria_feedback', {}),
+                'what_you_considered': eval_result.get('what_you_considered', []),
+                'areas_to_think_about': eval_result.get('areas_to_think_about', []),
+                'other_perspectives_reaction': eval_result.get('other_perspectives_reaction', []),
                 'what_you_did_well': evaluation.what_you_did_well,
                 'try_next_time': evaluation.try_next_time,
                 'tradeoffs_analysis': evaluation.tradeoffs_analysis,
@@ -815,6 +884,18 @@ class VivaadSessionResultView(APIView):
         decision = session.decision_record
         evaluation = session.evaluation_record
 
+        # Re-evaluate dynamically for fresh structured feedback if needed
+        engine = get_vivaad_engine()
+        all_turns = list(session.turns.all())
+        language = request.query_params.get('language', 'en')
+        fresh_eval = engine.evaluate_decision(
+            scenario=session.scenario,
+            selected_option_label=decision.selected_option_label,
+            reasoning=decision.reasoning,
+            turns=all_turns,
+            language=language
+        )
+
         return Response({
             'session_id': session.id,
             'scenario_title': session.scenario.title,
@@ -826,7 +907,14 @@ class VivaadSessionResultView(APIView):
             },
             'evaluation': {
                 'overall_score': evaluation.overall_score,
+                'makes_sense_because': fresh_eval.get('makes_sense_because', ''),
+                'think_about_this_too': fresh_eval.get('think_about_this_too', []),
+                'another_view': fresh_eval.get('another_view', ''),
                 'criteria_scores': evaluation.criteria_scores,
+                'criteria_feedback': fresh_eval.get('criteria_feedback', {}),
+                'what_you_considered': fresh_eval.get('what_you_considered', []),
+                'areas_to_think_about': fresh_eval.get('areas_to_think_about', []),
+                'other_perspectives_reaction': fresh_eval.get('other_perspectives_reaction', []),
                 'what_you_did_well': evaluation.what_you_did_well,
                 'try_next_time': evaluation.try_next_time,
                 'tradeoffs_analysis': evaluation.tradeoffs_analysis,

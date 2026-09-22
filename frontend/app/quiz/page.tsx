@@ -442,6 +442,61 @@ export default function KnowledgeCheckLearnerPage() {
             </div>
           )}
 
+          {/* Diagnostic Learning Feedback ("Teach, Don't Just Score") */}
+          {result.diagnostic_feedback && (
+            <div className="card-brutal bg-[#F8F7F2] p-6 rounded-2xl border-2 border-[#111111] space-y-4 shadow-brutal-sm">
+              <div className="flex items-center gap-2 border-b border-zinc-300 pb-3">
+                <BookOpen className="w-5 h-5 text-[#0F766E]" />
+                <h3 className="font-display font-black text-sm uppercase tracking-wider text-[#111111]">
+                  DIAGNOSTIC LEARNING FEEDBACK &bull; CONCEPTUAL ANALYSIS
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5 p-4 rounded-xl bg-white border border-zinc-300">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-800 block">
+                    ✓ What You Understood
+                  </span>
+                  <p className="text-xs sm:text-sm text-zinc-800 leading-relaxed font-medium">
+                    {result.diagnostic_feedback.what_you_understood}
+                  </p>
+                </div>
+
+                <div className="space-y-1.5 p-4 rounded-xl bg-white border border-zinc-300">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-800 block">
+                    ⚡ Where Confusion Exists
+                  </span>
+                  <p className="text-xs sm:text-sm text-zinc-800 leading-relaxed font-medium">
+                    {result.diagnostic_feedback.where_confusion_exists}
+                  </p>
+                </div>
+              </div>
+
+              {result.diagnostic_feedback.conceptual_contrast && (
+                <div className="p-4 rounded-xl bg-teal-50/70 border border-teal-200 space-y-2">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-teal-900 block">
+                    ★ Key Concept Distinction
+                  </span>
+                  <p className="text-xs sm:text-sm text-teal-950 leading-relaxed">
+                    {result.diagnostic_feedback.conceptual_contrast}
+                  </p>
+                  {result.diagnostic_feedback.concrete_example && (
+                    <div className="pt-2 mt-2 border-t border-teal-200/80 text-xs text-teal-900 italic">
+                      {result.diagnostic_feedback.concrete_example}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {result.diagnostic_feedback.concept_to_review && (
+                <div className="flex items-center justify-between text-xs font-mono px-3 py-2 bg-zinc-100 rounded-lg border border-zinc-300">
+                  <span className="text-zinc-600">Recommended for Review:</span>
+                  <span className="font-bold text-[#0F766E]">{result.diagnostic_feedback.concept_to_review}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Feedback Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="card-brutal bg-emerald-50/70 p-5 rounded-2xl border-2 border-emerald-800 space-y-2">

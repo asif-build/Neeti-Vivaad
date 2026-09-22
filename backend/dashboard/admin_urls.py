@@ -9,6 +9,7 @@ from .admin_views import (
     ReferenceDocumentsListAPIView,
     AdminCandidatesListAPIView
 )
+from core.reviews_views import AdminReviewManageView
 
 urlpatterns = [
     path('workforce-insights/', WorkforceInsightsAPIView.as_view(), name='admin-workforce-insights'),
@@ -19,4 +20,7 @@ urlpatterns = [
     path('scenarios/<int:scenario_id>/constraints/', ScenarioConstraintCreateAPIView.as_view(), name='admin-scenario-constraint-create'),
     path('scenarios/<int:scenario_id>/analytics/', ScenarioAnalyticsAPIView.as_view(), name='admin-scenario-analytics'),
     path('reference-documents/', ReferenceDocumentsListAPIView.as_view(), name='admin-reference-documents'),
+    path('reviews/', AdminReviewManageView.as_view(), name='admin-reviews-list'),
+    path('reviews/<int:review_id>/', AdminReviewManageView.as_view(), name='admin-reviews-detail'),
 ]
+

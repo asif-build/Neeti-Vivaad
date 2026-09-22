@@ -25,3 +25,10 @@ backend/.env
 Thumbs.db
 .vscode/
 .idea/
+
+# Binaries and scratch
+k6.zip
+k6_bin/
+backend/scratch/
+scratch/
+

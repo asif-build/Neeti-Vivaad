@@ -5,15 +5,20 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from core.throttling import BuddyRateThrottle
 from .services.context_service import BuddyContextService
 from .services.buddy_service import BuddyService
 
 class BuddyChatView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [BuddyRateThrottle]
 
     def post(self, request):
         message = request.data.get('message', '').strip()
         current_route = request.data.get('page', '') or request.data.get('current_route', '')
+        active_object_type = request.data.get('active_object_type', None)
+        active_object_id = request.data.get('active_object_id', None)
+        language = request.data.get('language', '') or getattr(request.user, 'buddy_language', 'en')
 
         if not message:
             return Response(
@@ -22,7 +27,14 @@ class BuddyChatView(APIView):
             )
 
         try:
-            result = BuddyService.answer_question(request.user, message, current_route)
+            result = BuddyService.answer_question(
+                request.user,
+                message,
+                current_route,
+                active_object_type=active_object_type,
+                active_object_id=active_object_id,
+                language=language
+            )
             return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
             print(f"[BuddyChatView Error]: {e}")
@@ -30,7 +42,8 @@ class BuddyChatView(APIView):
                 'message': "I'm having trouble reaching Neeti Saarthi right now. Please try again in a moment.",
                 'should_speak': False,
                 'suggested_actions': ["Try again", "What should I do first?"],
-                'context': 'general'
+                'context': 'general',
+                'subtitle': 'Your civil service companion'
             }, status=status.HTTP_200_OK)
 
 class BuddyContextView(APIView):
@@ -38,10 +51,16 @@ class BuddyContextView(APIView):
 
     def get(self, request):
         current_route = request.query_params.get('route', '')
-        user_context = BuddyContextService.get_user_context(request.user, current_route)
+        active_object_type = request.query_params.get('active_object_type', None)
+        active_object_id = request.query_params.get('active_object_id', None)
+        user_context = BuddyContextService.get_buddy_context(
+            request.user, current_route,
+            active_object_type=active_object_type,
+            active_object_id=active_object_id
+        )
         suggestions_data = BuddyContextService.get_route_suggestions(
             user_context['page_intent'],
-            user_context
+            user_context['user']
         )
 
         is_auth = bool(request.user and getattr(request.user, 'is_authenticated', False))
@@ -51,6 +70,7 @@ class BuddyContextView(APIView):
 
         return Response({
             'context': user_context,
+            'subtitle': user_context.get('subtitle', 'Your civil service companion'),
             'greeting': suggestions_data['greeting'],
             'suggestions': suggestions_data['suggestions'],
             'onboarding_tour_completed': tour_completed,

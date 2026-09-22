@@ -22,6 +22,7 @@ from .views import (
     AnswerFallacyView,
     GetDebateSessionView,
 )
+from .views_stream import VivaadDecisionStreamView
 
 urlpatterns = [
     # Phase 2: Authoring Studio Endpoints
@@ -38,6 +39,7 @@ urlpatterns = [
     path('sessions/start/', VivaadSessionStartView.as_view(), name='vivaad-session-start'),
     path('sessions/<int:session_id>/turn/', VivaadSessionTurnView.as_view(), name='vivaad-session-turn'),
     path('sessions/<int:session_id>/decide/', VivaadSessionDecideView.as_view(), name='vivaad-session-decide'),
+    path('sessions/<int:session_id>/decide-stream/', VivaadDecisionStreamView.as_view(), name='vivaad-session-decide-stream'),
     path('sessions/<int:session_id>/result/', VivaadSessionResultView.as_view(), name='vivaad-session-result'),
 
     # Legacy Debate Endpoints

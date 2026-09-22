@@ -283,12 +283,135 @@ def extract_txt(file_bytes: bytes) -> Dict[str, Any]:
     }
 
 
+def detect_source_questions(extracted_text: str, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Detects and extracts questions that naturally occur in the source document
+    (e.g., end-of-chapter exercises, self-assessment questions, progress checks).
+    Preserves real source questions rather than fabricating new ones.
+    """
+    found_questions: List[Dict[str, Any]] = []
+    seen_q = set()
+
+    # Regex for explicitly numbered question blocks with options: (a), (b), (c), (d)
+    q_block_pattern = re.compile(
+        r'(?:(?:Question|Q)\s*(\d+)[:.]?|(\d+)\.\s+)([^\n\?]+\?)\s*\n'
+        r'(?:\s*[\(]?[aA][\)\.]\s*([^\n]+)\n)?'
+        r'(?:\s*[\(]?[bB][\)\.]\s*([^\n]+)\n)?'
+        r'(?:\s*[\(]?[cC][\)\.]\s*([^\n]+)\n)?'
+        r'(?:\s*[\(]?[dD][\)\.]\s*([^\n]+))?',
+        re.MULTILINE | re.IGNORECASE
+    )
+
+    # Search in each chunk for exact page and section provenance
+    for chunk in chunks:
+        c_text = chunk.get("text", "")
+        page = chunk.get("page_number", 1)
+        section = chunk.get("section_title", f"Page {page}")
+        chunk_id = chunk.get("chunk_id", "")
+
+        for match in q_block_pattern.finditer(c_text):
+            q_num = match.group(1) or match.group(2) or str(len(found_questions) + 1)
+            q_text = _clean_text(match.group(3))
+            if len(q_text) < 15 or q_text.casefold() in seen_q:
+                continue
+
+            seen_q.add(q_text.casefold())
+
+            # Check if options (a, b, c, d) were extracted
+            opts = []
+            for opt_idx, g_idx in enumerate([4, 5, 6, 7], start=1):
+                raw_opt = match.group(g_idx)
+                if raw_opt:
+                    clean_opt = _clean_text(raw_opt)
+                    if clean_opt:
+                        opts.append({
+                            "text": clean_opt,
+                            "is_correct": (opt_idx == 1) # Default first candidate, validated later
+                        })
+
+            found_questions.append({
+                "source_question_number": q_num,
+                "question": q_text,
+                "type": "MCQ" if len(opts) >= 2 else "SHORT_ANSWER",
+                "options": opts,
+                "page": page,
+                "section": section,
+                "chunk_id": chunk_id,
+                "evidence_text": match.group(0)[:250],
+                "is_source_question": True
+            })
+
+    # Also scan for standalone interrogative sentences in "Exercises" or "Review" sections
+    for chunk in chunks:
+        section = chunk.get("section_title", "")
+        if re.search(r'\b(exercise|review|quiz|assessment|questions|check\s*your\s*progress)\b', section, re.IGNORECASE):
+            c_text = chunk.get("text", "")
+            page = chunk.get("page_number", 1)
+            chunk_id = chunk.get("chunk_id", "")
+
+            sentences = re.split(r'(?<=\?)\s+', c_text)
+            for s in sentences:
+                clean_s = _clean_text(s)
+                if clean_s.endswith('?') and 20 <= len(clean_s) <= 220:
+                    clean_clean = re.sub(r'^\s*(?:\d+[\.\)]|Q\d+[\.\:])\s*', '', clean_s)
+                    if clean_clean.casefold() not in seen_q and len(clean_clean) >= 15:
+                        seen_q.add(clean_clean.casefold())
+                        found_questions.append({
+                            "question": clean_clean,
+                            "type": "MCQ",
+                            "options": [],
+                            "page": page,
+                            "section": section,
+                            "chunk_id": chunk_id,
+                            "evidence_text": clean_s,
+                            "is_source_question": True
+                        })
+
+    return found_questions
+
+
+def detect_learning_objectives(chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Extracts key learning objectives, competency goals, and core principles from source chunks.
+    """
+    objectives: List[Dict[str, Any]] = []
+    seen = set()
+
+    for chunk in chunks:
+        section = chunk.get("section_title", "")
+        c_text = chunk.get("text", "")
+        page = chunk.get("page_number", 1)
+
+        is_obj_section = bool(re.search(r'\b(objective|outcome|competenc|key\s*concept|overview|scope)\b', section, re.IGNORECASE))
+        lines = c_text.splitlines()
+
+        for line in lines:
+            clean = _clean_text(line)
+            if not clean or len(clean) < 25 or len(clean) > 200:
+                continue
+
+            # Check bullet lines or objective statements
+            if is_obj_section or re.match(r'^(?:[\-\*•]|\d+\.|\bUnderstand\b|\bLearn\b|\bAnalyze\b|\bEnsure\b|\bApply\b)', clean, re.IGNORECASE):
+                if clean.casefold() not in seen:
+                    seen.add(clean.casefold())
+                    objectives.append({
+                        "objective": clean,
+                        "section": section,
+                        "page": page
+                    })
+                    if len(objectives) >= 8:
+                        return objectives
+
+    return objectives
+
+
 def process_document_source(file_bytes: bytes, filename: str) -> Dict[str, Any]:
     """
     Full extraction pipeline:
     1. Validates size, extension, integrity.
     2. Calculates SHA-256 hash.
     3. Extracts text and chunks preserving page number and section provenance.
+    4. Detects existing source questions and learning objectives.
     """
     file_type = validate_file_security(file_bytes, filename)
     content_hash = hashlib.sha256(file_bytes).hexdigest()
@@ -303,4 +426,9 @@ def process_document_source(file_bytes: bytes, filename: str) -> Dict[str, Any]:
     extracted["file_size"] = len(file_bytes)
     extracted["content_hash"] = content_hash
     extracted["filename"] = filename
+
+    # Detect pre-existing questions and objectives
+    extracted["detected_source_questions"] = detect_source_questions(extracted["extracted_text"], extracted["chunks"])
+    extracted["detected_learning_objectives"] = detect_learning_objectives(extracted["chunks"])
+
     return extracted

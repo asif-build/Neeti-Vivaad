@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { VivaadTreeLogo } from '../components/Logo';
 import { Mail, CheckCircle2, RefreshCw, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 import { getApiBaseUrl } from '../utils/api';
+import { executeRecaptcha } from '../utils/recaptcha';
 
 function VerifyEmailNoticeContent() {
   const searchParams = useSearchParams();
@@ -30,10 +31,11 @@ function VerifyEmailNoticeContent() {
 
     try {
       const base = getApiBaseUrl();
+      const recaptcha_token = await executeRecaptcha('resend_verification');
       const res = await fetch(`${base}/api/auth/resend-verification/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email, recaptcha_token })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to resend verification email.');

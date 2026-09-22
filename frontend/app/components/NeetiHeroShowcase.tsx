@@ -57,26 +57,6 @@ export function NeetiHeroShowcase() {
         </div>
       </motion.div>
 
-      {/* Vector Sharp Floating Sticker (Different Beliefs, Same Purpose, A Better India) */}
-      <motion.div 
-        animate={{ y: [0, -6, 0], rotate: [6, 4, 6] }}
-        transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
-        className="hidden md:flex flex-col items-end absolute right-6 lg:right-16 top-[40%] lg:top-[42%] z-20 select-none pointer-events-none text-right"
-      >
-        <div className="font-['Caveat',cursive] text-2xl lg:text-[1.85rem] font-bold leading-[1.1] text-[#111111] tracking-wide">
-          <div>Different</div>
-          <div>Beliefs</div>
-          <div className="mt-0.5">Same Purpose</div>
-          <div>A Better India</div>
-        </div>
-        
-        {/* Tricolor Brush Stroke Underlines */}
-        <div className="mt-1 flex flex-col items-end gap-0.5 w-full">
-          <div className="h-1.5 w-24 bg-[#FF9933] rounded-full shadow-xs" />
-          <div className="h-1.5 w-20 bg-[#138808] rounded-full shadow-xs" />
-        </div>
-      </motion.div>
-
       {/* Bottom Public Servants Crowd Artwork (Crisp High-Res Vector-Quality Rendering) */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}

@@ -1,6 +1,7 @@
 import secrets
 from datetime import timedelta
 from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 
@@ -191,3 +192,29 @@ class EmailLog(models.Model):
 
     def __str__(self):
         return f"[{self.status}] {self.email_type} to {self.recipient_email} at {self.created_at}"
+
+
+class ReviewStatus(models.TextChoices):
+    PENDING = 'PENDING', 'Pending Moderation'
+    APPROVED = 'APPROVED', 'Approved'
+    REJECTED = 'REJECTED', 'Rejected'
+    HIDDEN = 'HIDDEN', 'Hidden'
+
+
+class Review(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews')
+    rating = models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], help_text="Rating 1 to 5")
+    comment = models.TextField(help_text="Learner review and feedback")
+    display_name = models.CharField(max_length=100, blank=True, null=True, help_text="Optional custom display name")
+    feature_used = models.CharField(max_length=50, blank=True, null=True, help_text="e.g. Neeti Vivaad, Knowledge Check, Learn, Profile, Buddy")
+    status = models.CharField(max_length=20, choices=ReviewStatus.choices, default=ReviewStatus.PENDING)
+    is_flagged = models.BooleanField(default=False)
+    moderator_notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Review #{self.id} by {self.user.username} ({self.rating}★) - {self.status}"

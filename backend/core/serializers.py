@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import (
     User, OfficialProfile, EmailVerificationToken,
     CompetencyDomain, SubSkill, OfficialSkillProficiency, RoleCompetencyRequirement
@@ -67,7 +69,7 @@ class UserSerializer(serializers.ModelSerializer):
         return []
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True, min_length=6)
+    password = serializers.CharField(write_only=True, required=True, min_length=12)
     email = serializers.EmailField(required=True)
     first_name = serializers.CharField(required=True)
     last_name = serializers.CharField(required=True)
@@ -91,6 +93,35 @@ class RegisterSerializer(serializers.ModelSerializer):
         if User.objects.filter(email__iexact=value.strip()).exists():
             raise serializers.ValidationError("An account already exists with this email address. Please log in with your account.")
         return value.strip().lower()
+
+    def validate(self, attrs):
+        password = attrs.get('password')
+        email = attrs.get('email', '').strip().lower()
+        first_name = attrs.get('first_name', '').strip()
+        last_name = attrs.get('last_name', '').strip()
+
+        # 1. Personal information similarity check (substring match)
+        pwd_lower = password.lower()
+        for attr in [first_name.lower(), last_name.lower(), email.split('@')[0].lower()]:
+            if attr and len(attr) >= 3 and attr in pwd_lower:
+                raise serializers.ValidationError({
+                    'password': [f"The password is too similar to your personal information ({attr})."]
+                })
+
+        # 2. Django AUTH_PASSWORD_VALIDATORS enforcement
+        temp_user = User(
+            username=email,
+            email=email,
+            first_name=first_name,
+            last_name=last_name
+        )
+
+        try:
+            validate_password(password, user=temp_user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({'password': list(exc.messages)})
+
+        return attrs
 
     def create(self, validated_data):
         password = validated_data.pop('password')

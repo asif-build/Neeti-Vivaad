@@ -1,4 +1,7 @@
 export function getApiBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_BASE) {
+    return process.env.NEXT_PUBLIC_API_BASE.replace(/\/+$/, '');
+  }
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     const protocol = window.location.protocol;
@@ -6,10 +9,11 @@ export function getApiBaseUrl(): string {
       return `${protocol}//${hostname}:8000`;
     }
   }
-  return process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
+  return 'http://127.0.0.1:8000';
 }
 
-export const API_BASE = 'http://127.0.0.1:8000';
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
+
 
 export function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;

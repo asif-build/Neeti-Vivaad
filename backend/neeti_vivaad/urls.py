@@ -8,6 +8,8 @@ from core.views import (
     ResumeUploadView, ConfirmSkillsView, CareerGoalsView,
     LearningPreferencesView, FinalizeCompetenciesView
 )
+from core.reviews_views import PublicReviewListView, SubmitReviewView
+from core.support_views import SupportTicketView
 
 def api_root(request):
     return JsonResponse({
@@ -17,6 +19,8 @@ def api_root(request):
         "endpoints": {
             "admin": "/admin/",
             "auth": "/api/auth/",
+            "reviews": "/api/reviews/",
+            "support": "/api/support/",
             "onboarding": "/api/onboarding/",
             "profile": "/api/profile/",
             "competencies": "/api/profile/competencies/",
@@ -33,6 +37,9 @@ urlpatterns = [
     path('', api_root, name='api-root'),
     path('admin/', admin.site.urls),
     path('api/auth/', include('core.urls')),
+    path('api/reviews/', PublicReviewListView.as_view(), name='public-reviews'),
+    path('api/reviews/submit/', SubmitReviewView.as_view(), name='submit-review'),
+    path('api/support/', SupportTicketView.as_view(), name='support-ticket'),
     path('api/onboarding/resume-upload/', ResumeUploadView.as_view(), name='onboarding-resume-upload-root'),
     path('api/onboarding/confirm-skills/', ConfirmSkillsView.as_view(), name='onboarding-confirm-skills-root'),
     path('api/onboarding/career-goals/', CareerGoalsView.as_view(), name='onboarding-career-goals-root'),

@@ -4,8 +4,10 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Logo } from '../components/Logo';
-import { Lock, Mail, Building, User, ArrowRight, Phone, Briefcase, Sparkles, ShieldCheck } from 'lucide-react';
+import { Lock, Mail, Building, User, ArrowRight, Phone, Briefcase, Sparkles, ShieldCheck, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getApiBaseUrl } from '../utils/api';
+import { getRecaptchaToken } from '../utils/recaptcha';
+import { PasswordStrengthMeter, calculatePasswordStrength } from '../components/PasswordStrengthMeter';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -16,6 +18,9 @@ export default function RegisterPage() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [mobileNumber, setMobileNumber] = useState('');
   const [designation, setDesignation] = useState('');
   const [department, setDepartment] = useState('');
@@ -26,16 +31,42 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+
+    // Password validations
+    if (password.length < 12) {
+      setError("Password must be at least 12 characters long.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match. Please re-enter your password.");
+      return;
+    }
+
+    const strength = calculatePasswordStrength(password, { firstName, lastName, email });
+    if (strength.isCommon) {
+      setError("This password is too common or easily guessable. Please choose a stronger phrase.");
+      return;
+    }
+    if (strength.isSimilarToPersonalInfo) {
+      setError(`Password contains your ${strength.similarItems.join(' or ')}. Please avoid using personal information.`);
+      return;
+    }
+
+    setLoading(true);
 
     const skillsArray = skills ? skills.split(',').map(s => s.trim()).filter(Boolean) : [];
 
     try {
+      const captchaToken = await getRecaptchaToken('register');
       const base = getApiBaseUrl();
       const res = await fetch(`${base}/api/auth/register/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(captchaToken ? { 'X-Recaptcha-Token': captchaToken } : {})
+        },
         body: JSON.stringify({
           first_name: firstName,
           last_name: lastName,
@@ -47,7 +78,8 @@ export default function RegisterPage() {
           organisation: organisation || 'Government of India',
           experience_years: parseFloat(experience) || 0,
           education: education || '',
-          skills: skillsArray
+          skills: skillsArray,
+          recaptcha_token: captchaToken
         })
       });
 
@@ -71,19 +103,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F7F2] text-[#111111] flex flex-col justify-center items-center px-4 py-12 font-sans relative overflow-hidden">
-      {/* Background Graphic Grid Pattern */}
-      <div 
-        className="absolute inset-0 pointer-events-none opacity-20"
-        style={{
-          backgroundImage: `
-            linear-gradient(to right, #111111 1px, transparent 1px),
-            linear-gradient(to bottom, #111111 1px, transparent 1px)
-          `,
-          backgroundSize: '36px 36px'
-        }}
-      />
-
+    <div className="min-h-screen bg-white text-[#111111] flex flex-col justify-center items-center px-4 py-12 font-sans relative overflow-hidden">
       <div className="w-full max-w-lg relative z-10 space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-3 flex flex-col items-center">
@@ -91,7 +111,7 @@ export default function RegisterPage() {
             <Logo variant="auth" isDark={false} className="h-11 sm:h-12" />
           </Link>
           <span className="badge-starburst badge-starburst-saffron text-[10px]">
-            ★ MoSPI SIH26101 REGISTRATION
+            ★ CIVIL SERVICE REGISTRATION
           </span>
         </div>
 
@@ -185,35 +205,88 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
+            {/* Password Field with Show/Hide Toggle */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
                 <label className="text-xs font-mono font-bold uppercase text-[#111111]">Password *</label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-[#111111] absolute left-3 top-3" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    placeholder="Min 6 characters"
-                    className="w-full pl-9 pr-3 py-2 rounded-xl border-2 border-[#111111] text-xs font-mono text-[#111111] font-medium placeholder:text-[#4B5563] bg-[#F8F7F2] focus:bg-white focus:outline-none shadow-brutal-sm"
-                  />
-                </div>
+                <span className="text-[10px] font-mono text-zinc-500 font-medium">Minimum 12 characters</span>
+              </div>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-[#111111] absolute left-3 top-3" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  minLength={12}
+                  placeholder="At least 12 characters"
+                  className="w-full pl-9 pr-10 py-2 rounded-xl border-2 border-[#111111] text-xs font-mono text-[#111111] font-medium placeholder:text-[#4B5563] bg-[#F8F7F2] focus:bg-white focus:outline-none shadow-brutal-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-zinc-600 hover:text-[#111111] p-0.5 focus:outline-none"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-mono font-bold uppercase text-[#111111]">Mobile Number</label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-[#111111] absolute left-3 top-3" />
-                  <input
-                    type="tel"
-                    value={mobileNumber}
-                    onChange={e => setMobileNumber(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="w-full pl-9 pr-3 py-2 rounded-xl border-2 border-[#111111] text-xs font-mono text-[#111111] font-medium placeholder:text-[#4B5563] bg-[#F8F7F2] focus:bg-white focus:outline-none shadow-brutal-sm"
-                  />
-                </div>
+              {/* Live Password Strength Recommender */}
+              <PasswordStrengthMeter password={password} personalInfo={{ firstName, lastName, email }} />
+            </div>
+
+            {/* Confirm Password Field with Match Indicator */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono font-bold uppercase text-[#111111]">Confirm Password *</label>
+                {confirmPassword && (
+                  <span className={`text-[10px] font-mono font-bold flex items-center gap-1 ${
+                    password === confirmPassword ? 'text-emerald-700' : 'text-rose-600'
+                  }`}>
+                    {password === confirmPassword ? (
+                      <><CheckCircle2 className="w-3 h-3" /> Passwords Match</>
+                    ) : (
+                      <><AlertCircle className="w-3 h-3" /> Passwords Do Not Match</>
+                    )}
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-[#111111] absolute left-3 top-3" />
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={12}
+                  placeholder="Re-enter your password"
+                  className={`w-full pl-9 pr-10 py-2 rounded-xl border-2 text-xs font-mono font-medium placeholder:text-[#4B5563] bg-[#F8F7F2] focus:bg-white focus:outline-none shadow-brutal-sm ${
+                    confirmPassword && password !== confirmPassword ? 'border-rose-500' : 'border-[#111111]'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-2.5 text-zinc-600 hover:text-[#111111] p-0.5 focus:outline-none"
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-mono font-bold uppercase text-[#111111]">Mobile Number</label>
+              <div className="relative">
+                <Phone className="w-4 h-4 text-[#111111] absolute left-3 top-3" />
+                <input
+                  type="tel"
+                  value={mobileNumber}
+                  onChange={e => setMobileNumber(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  className="w-full pl-9 pr-3 py-2 rounded-xl border-2 border-[#111111] text-xs font-mono text-[#111111] font-medium placeholder:text-[#4B5563] bg-[#F8F7F2] focus:bg-white focus:outline-none shadow-brutal-sm"
+                />
               </div>
             </div>
 
@@ -255,6 +328,13 @@ export default function RegisterPage() {
               <span>{loading ? 'Creating Official Account...' : 'Register Official Account'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
+
+            <p className="text-[11px] font-mono text-center text-[#4B5563] pt-1">
+              By creating an account, you agree to our{' '}
+              <Link href="/terms" className="underline font-bold text-[#111111] hover:text-[#0F766E]">Terms of Use</Link>
+              {' '}and{' '}
+              <Link href="/privacy-policy" className="underline font-bold text-[#111111] hover:text-[#0F766E]">Privacy Policy</Link>.
+            </p>
           </form>
 
           <div className="text-center pt-3 border-t-2 border-[#111111]">

@@ -4,20 +4,7 @@ import { Home, Compass, BookOpen, MessageSquare, ArrowRight } from 'lucide-react
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 text-center font-sans relative overflow-hidden bg-[#F8F7F2] text-[#111111] selection:bg-[#F2A900] selection:text-[#111111]">
-      
-      {/* Background Graphic Grid Pattern */}
-      <div 
-        className="absolute inset-0 pointer-events-none opacity-20"
-        style={{
-          backgroundImage: `
-            linear-gradient(to right, #111111 1px, transparent 1px),
-            linear-gradient(to bottom, #111111 1px, transparent 1px)
-          `,
-          backgroundSize: '36px 36px'
-        }}
-      />
-
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 text-center font-sans relative overflow-hidden bg-white text-[#111111] selection:bg-[#F2A900] selection:text-[#111111]">
       <div className="relative z-10 max-w-xl mx-auto flex flex-col items-center space-y-6">
         {/* Centerpiece Illustration Card */}
         <div className="card-brutal bg-white p-6 sm:p-8 rounded-[28px] shadow-brutal-xl relative w-full max-w-[380px] flex flex-col items-center justify-center">

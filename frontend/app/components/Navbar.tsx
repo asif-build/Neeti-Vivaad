@@ -6,12 +6,14 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Logo } from './Logo';
 import { UserCheck, Shield, LogOut, LogIn, UserPlus, Sparkles } from 'lucide-react';
 import { getAccessToken, getSavedUser, clearTokens, authFetch } from '../utils/api';
+import { useLanguage } from '../context/LanguageContext';
 
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<any | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     const checkUser = () => {
@@ -52,22 +54,23 @@ export function Navbar() {
     router.push('/');
   };
 
-  // Render navbar only on relevant main application routes (exclude auth, onboarding, and 404/not-found)
-  const allowedExactRoutes = ['/', '/dashboard', '/courses', '/quiz', '/debate', '/admin-dashboard'];
+  // Render navbar on main application routes including Neeti Vivaad and public info pages
+  const allowedExactRoutes = ['/', '/dashboard', '/courses', '/quiz', '/admin-dashboard', '/debate', '/about', '/support', '/privacy-policy', '/terms'];
   const isAllowed = allowedExactRoutes.includes(pathname) || (pathname && pathname.startsWith('/admin/'));
+
 
   if (!isAllowed) return null;
 
   const navLinks = [
-    { href: '/', label: 'Home' },
-    { href: '/dashboard', label: 'My Profile' },
-    { href: '/courses', label: 'Learn' },
-    { href: '/quiz', label: 'Knowledge Check' },
-    { href: '/debate', label: 'Neeti Vivaad' },
+    { href: '/', label: t('nav.home', 'Home') },
+    { href: '/dashboard', label: t('nav.profile', 'My Profile') },
+    { href: '/courses', label: t('nav.learn', 'Learn') },
+    { href: '/quiz', label: t('nav.quiz', 'Knowledge Check') },
+    { href: '/debate', label: t('nav.vivaad', 'Neeti Vivaad') },
   ];
 
   if (user && user.role === 'ADMIN') {
-    navLinks.push({ href: '/admin-dashboard', label: 'Admin Overview' });
+    navLinks.push({ href: '/admin-dashboard', label: t('nav.admin', 'Admin Overview') });
   }
 
   const userName = user ? (`${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username) : '';
@@ -104,6 +107,7 @@ export function Navbar() {
 
         {/* Right: Action Buttons */}
         <div className="flex items-center gap-2 sm:gap-3">
+
           {user ? (
             <>
               <div className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono bg-zinc-100 border-2 border-[#111111] shadow-brutal-sm text-[#111111]">
@@ -125,16 +129,16 @@ export function Navbar() {
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-display font-extrabold uppercase tracking-wider bg-white text-[#111111] border-2 border-[#111111] shadow-brutal-sm hover:bg-zinc-100 active:scale-95 transition-all"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span>Sign Out</span>
+                <span>{t('nav.sign_out', 'Sign Out')}</span>
               </button>
             </>
           ) : (
             <div className="flex items-center gap-2 sm:gap-3">
               <Link
                 href="/courses"
-                className="inline-flex items-center px-4 sm:px-5 py-2 rounded-full text-xs font-display font-extrabold uppercase tracking-wider bg-[#2DD4BF] text-[#111111] border-2 border-[#111111] shadow-brutal-sm hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-brutal active:translate-x-0 active:translate-y-0 transition-all"
+                className="hidden sm:inline-flex items-center px-4 sm:px-5 py-2 rounded-full text-xs font-display font-extrabold uppercase tracking-wider bg-[#2DD4BF] text-[#111111] border-2 border-[#111111] shadow-brutal-sm hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-brutal active:translate-x-0 active:translate-y-0 transition-all"
               >
-                <span>EXPLORE COURSES</span>
+                <span>{t('nav.explore_courses', 'EXPLORE COURSES')}</span>
               </Link>
 
               <Link
@@ -142,7 +146,7 @@ export function Navbar() {
                 className="inline-flex items-center gap-1 px-4 sm:px-5 py-2 rounded-full text-xs font-display font-extrabold uppercase tracking-wider bg-[#F2A900] text-[#111111] border-2 border-[#111111] shadow-brutal-sm hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-brutal active:translate-x-0 active:translate-y-0 transition-all"
               >
                 <LogIn className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>SIGN IN</span>
+                <span>{t('nav.sign_in', 'SIGN IN')}</span>
               </Link>
             </div>
           )}

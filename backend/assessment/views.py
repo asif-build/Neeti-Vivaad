@@ -1,5 +1,6 @@
 import hashlib
 import os
+import re
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -7,6 +8,8 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from core.models import User, SubSkill, CompetencyDomain, OfficialSkillProficiency
+from core.throttling import KnowledgeCheckGenThrottle, QuizSubmissionThrottle, ResumeUploadThrottle
+from core.recaptcha import verify_recaptcha
 from .models import (
     BaselineQuestion, BaselineAssessmentAttempt,
     DocumentUpload, Quiz, Question, Option, QuizAttempt, QuizAnswer
@@ -144,6 +147,7 @@ class DocumentUploadView(APIView):
     Extracts text, preserves page and section provenance, builds chunks.
     """
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ResumeUploadThrottle]
 
     def post(self, request):
         user = request.user
@@ -159,13 +163,32 @@ class DocumentUploadView(APIView):
 
         try:
             if file_obj:
-                filename = file_obj.name
+                if file_obj.size > 15 * 1024 * 1024:
+                    return Response({'error': "File size exceeds 15MB limit. Please upload a smaller document."}, status=status.HTTP_400_BAD_REQUEST)
+
+                # Sanitize filename
+                safe_basename = os.path.basename(file_obj.name)
+                clean_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', safe_basename)
+                file_obj.name = clean_filename
+                filename = clean_filename
+
+                # Magic byte check
+                ext = os.path.splitext(filename)[1].lower()
+                if ext not in ['.pdf', '.docx', '.doc', '.txt']:
+                    return Response({'error': f"Unsupported file extension '{ext}'. Only PDF, DOCX, and TXT are supported."}, status=status.HTTP_400_BAD_REQUEST)
+
                 file_bytes = file_obj.read()
                 if len(file_bytes) == 0:
                     return Response(
                         {'error': "Uploaded file is empty. Please select a valid document."},
                         status=status.HTTP_400_BAD_REQUEST
                     )
+
+                if ext == '.pdf' and not file_bytes[:4] == b'%PDF':
+                    return Response({'error': 'Uploaded file is not a valid PDF document.'}, status=status.HTTP_400_BAD_REQUEST)
+                elif ext == '.docx' and not file_bytes[:4] == b'PK\x03\x04':
+                    return Response({'error': 'Uploaded file is not a valid DOCX document.'}, status=status.HTTP_400_BAD_REQUEST)
+
                 extracted_data = process_document_source(file_bytes, filename)
             else:
                 filename = "Pasted Document.txt"
@@ -212,85 +235,158 @@ class DocumentUploadView(APIView):
 # KNOWLEDGE CHECK STUDIO (Authoring Flow: Generate, Review, Edit, Publish)
 # =====================================================================
 
+def synthesize_diagnostic_feedback(quiz, correct_items, incorrect_items):
+    """
+    Teaches the learner by diagnosing understanding vs misconceptions.
+    Never merely shows a raw score like '4/10'.
+    Explains:
+    - what the learner understood
+    - where confusion exists
+    - why the correct answer is right
+    - what concept should be reviewed
+    - a concrete, relatable civil service example
+    """
+    total = len(correct_items) + len(incorrect_items)
+    score_pct = round((len(correct_items) / total) * 100.0, 1) if total > 0 else 0.0
+
+    if not incorrect_items:
+        return {
+            "what_you_understood": f"You demonstrated complete understanding of the standards and statutory requirements in \"{quiz.title}\".",
+            "where_confusion_exists": "No conceptual misunderstandings identified in this check.",
+            "conceptual_contrast": "Your answers reflect precise application of both regulatory requirements and operational procedures.",
+            "concrete_example": "You accurately distinguished mandatory statutory requirements from discretionary administrative measures across all tested scenarios.",
+            "concept_to_review": "Ready to advance to policy decision simulations in Neeti Vivaad."
+        }
+
+    # Extract themes from incorrect questions
+    misunderstood_sections = [item.get('source_section') for item in incorrect_items if item.get('source_section')]
+    section_label = misunderstood_sections[0] if misunderstood_sections else (quiz.subskill.name if quiz.subskill else "Official Standard")
+
+    first_err = incorrect_items[0]
+    q_txt = first_err.get('question_text', '')
+
+    # Check for common civil service conceptual contrasts
+    if re.search(r'\b(retention|storage|minimi|collect)\b', q_txt, re.IGNORECASE):
+        confusion_title = "data minimization versus data retention"
+        contrast_expl = (
+            "Data minimization means collecting strictly what is necessary for the immediate public service task. "
+            "Data retention determines the duration a collected record may legally be preserved before mandatory deletion or archiving."
+        )
+        example_str = (
+            "Example: Collecting only an applicant's current address for a scheme is data minimization; "
+            "scheduling that address record for automated deletion 6 months after disbursement is retention compliance."
+        )
+    elif re.search(r'\b(consent|anonymis|identif|mask|differen)\b', q_txt, re.IGNORECASE):
+        confusion_title = "informed consent versus technical anonymisation"
+        contrast_expl = (
+            "Consent is the legal permission given by a citizen for a specific purpose. "
+            "Anonymisation is an irreversible technical transformation ensuring individuals cannot be re-identified even when combined with external registries."
+        )
+        example_str = (
+            "Example: Having a citizen sign an authorization form is consent; "
+            "stripping direct identifiers and applying differential privacy filters before statistical release is anonymisation."
+        )
+    elif re.search(r'\b(discretion|mandat|statutory|waiver|exempt)\b', q_txt, re.IGNORECASE):
+        confusion_title = "statutory mandates versus operational discretion"
+        contrast_expl = (
+            "Statutory mandates are legal duties that no administrative officer has the authority to waive or dilute. "
+            "Operational discretion applies only to implementation modalities where the guideline explicitly permits procedural flexibility."
+        )
+        example_str = (
+            "Example: Maintaining verification logs is a mandatory statutory duty; "
+            "deciding whether to conduct field audits via mobile app or physical register is operational discretion."
+        )
+    else:
+        confusion_title = f"procedural compliance in {section_label}"
+        contrast_expl = (
+            f"Official guidelines on Page {first_err.get('source_page', 1)} mandate strict adherence to verifiable parameters, "
+            "rather than informal local adaptations."
+        )
+        example_str = f"Refer to the exact requirement on Page {first_err.get('source_page', 1)}: \"{first_err.get('evidence_text', '')[:100]}...\""
+
+    what_understood = (
+        f"You demonstrated solid grasp of the core provisions in {len(correct_items)} of {total} questions, including baseline administrative protocols."
+        if correct_items else
+        f"You have begun reviewing {quiz.title}. Foundational standards require careful reference to the source document."
+    )
+
+    return {
+        "what_you_understood": what_understood,
+        "where_confusion_exists": f"Your answers suggest some confusion regarding {confusion_title}.",
+        "conceptual_contrast": contrast_expl,
+        "concrete_example": example_str,
+        "concept_to_review": f"{section_label} (Page {first_err.get('source_page', 1)})"
+    }
+
+
 class GenerateQuizView(APIView):
     """
-    Generate a grounded Knowledge Check draft from an uploaded document.
-    Enforces user ownership (IDOR check) and strict citation provenance.
+    Generates a grounded Knowledge Check from uploaded document material.
+    Preserves real source questions first. Strict validation prevents hallucination.
     """
     permission_classes = [IsAuthenticated]
+    throttle_classes = [KnowledgeCheckGenThrottle]
 
     def post(self, request):
         user = request.user
-        document_id = request.data.get('document_id')
-        title = request.data.get('title', '').strip()
+        doc_id = request.data.get('document_id')
         num_questions = int(request.data.get('num_questions', 5))
         difficulty = request.data.get('difficulty', 'Intermediate')
         question_types = request.data.get('question_types', ['MCQ', 'TRUE_FALSE', 'SCENARIO'])
         subskill_id = request.data.get('subskill_id')
+        title = request.data.get('title', '').strip()
 
-        # Limit question count between 2 and 20
-        num_questions = max(2, min(20, num_questions))
-
-        # Ownership enforcement (IDOR protection)
-        try:
-            doc = DocumentUpload.objects.get(id=document_id, user=user)
-        except DocumentUpload.DoesNotExist:
+        # Bot protection verification
+        recaptcha_token = request.data.get('recaptcha_token', '')
+        captcha_valid, _ = verify_recaptcha(recaptcha_token, action='generate_quiz')
+        if not captcha_valid:
             return Response(
-                {'error': 'Document not found or you are not authorized to access it.'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        if not doc.chunks:
-            return Response(
-                {'error': "We couldn't create enough questions from this material."},
+                {'error': 'Security verification failed. Please try again.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        if not doc_id:
+            return Response({'error': 'document_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            doc = DocumentUpload.objects.get(id=doc_id)
+        except DocumentUpload.DoesNotExist:
+            return Response({'error': 'Document not found.'}, status=status.HTTP_404_NOT_FOUND)
+
         subskill = None
         if subskill_id:
-            subskill = SubSkill.objects.filter(id=subskill_id).first()
-        if not subskill:
-            subskill = SubSkill.objects.first()
-
-        # Try generator.generate_grounded_quiz first (handles configured LLM or patched tests)
-        generated_data = None
-        try:
-            from .generator import generate_grounded_quiz
-            llm_results = generate_grounded_quiz(doc.extracted_text, num_questions=num_questions)
-            if llm_results:
-                generated_data = []
-                for q in llm_results:
-                    generated_data.append({
-                        "question": q["question"],
-                        "type": "MCQ",
-                        "difficulty": difficulty,
-                        "options": q["options"],
-                        "correct_answer": next((o["text"] for o in q["options"] if o.get("is_correct")), ""),
-                        "explanation": q.get("explanation", ""),
-                        "evidence_text": q.get("source_citation", ""),
-                        "source_citation": q.get("source_citation", ""),
-                        "source_page": 1,
-                        "source_section": "General"
-                    })
-        except Exception:
-            pass
-
-        if not generated_data:
-            provider = get_ai_provider()
             try:
-                generated_data = provider.generate_questions(
-                    chunks=doc.chunks,
-                    num_questions=num_questions,
-                    difficulty=difficulty,
-                    question_types=question_types
-                )
-            except AIProviderError as exc:
-                return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-            except Exception:
-                return Response(
-                    {'error': "We couldn't prepare the knowledge check. Please try again."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+                subskill = SubSkill.objects.get(id=subskill_id)
+            except SubSkill.DoesNotExist:
+                pass
+
+        doc_info = {'id': doc.id, 'title': doc.title}
+        competency_code = subskill.code if subskill else 'GOV-GEN'
+
+        # Detect pre-existing questions in source document
+        source_qs = []
+        if hasattr(doc, 'chunks') and isinstance(doc.chunks, list) and len(doc.chunks) > 0:
+            from .extraction import detect_source_questions
+            source_qs = detect_source_questions(doc.extracted_text, doc.chunks)
+
+        provider = get_ai_provider()
+        try:
+            generated_data = provider.generate_questions(
+                chunks=doc.chunks,
+                num_questions=num_questions,
+                difficulty=difficulty,
+                question_types=question_types,
+                source_questions=source_qs,
+                doc_info=doc_info,
+                competency_code=competency_code
+            )
+        except AIProviderError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return Response(
+                {'error': "We couldn't prepare the knowledge check. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
         quiz_title = title or f"Knowledge Check: {doc.title[:45]}"
         time_estimate = max(3, round(len(generated_data) * 1.5))
@@ -320,7 +416,11 @@ class GenerateQuizView(APIView):
                 evidence_text=item.get('evidence_text', ''),
                 source_citation=item.get('source_citation', f"Page {item.get('source_page', 1)}"),
                 explanation=item.get('explanation', ''),
-                created_by_ai=True,
+                created_by_ai=not item.get('is_source_question', False),
+                is_source_question=item.get('is_source_question', False),
+                validation_status=item.get('validation_status', 'VALIDATED'),
+                validation_notes=item.get('validation_notes', ''),
+                provenance_metadata=item.get('provenance_metadata', {}),
                 order=idx
             )
 
@@ -657,6 +757,12 @@ class StudioQuizPublishView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        if quiz.questions.filter(validation_status='PENDING_REVIEW').exists():
+            return Response(
+                {'error': 'This Knowledge Check has questions pending validation review. Resolve or edit them before publishing.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         quiz.status = 'PUBLISHED'
         quiz.published_at = timezone.now()
         quiz.save()
@@ -803,6 +909,7 @@ class SubmitQuizView(APIView):
     competency progression with recorded provenance.
     """
     permission_classes = [IsAuthenticated]
+    throttle_classes = [QuizSubmissionThrottle]
 
     def post(self, request, quiz_id=None):
         user = request.user
@@ -935,6 +1042,11 @@ class SubmitQuizView(APIView):
             prof.save()
             new_prof_score = prof.score
 
+        # Synthesize Diagnostic Teaching Feedback ("Teach, Don't Just Score")
+        correct_items = [d for d in detailed_results if d['is_correct']]
+        incorrect_items = [d for d in detailed_results if not d['is_correct']]
+        diagnostic_feedback = synthesize_diagnostic_feedback(quiz, correct_items, incorrect_items)
+
         # Distinct feedback summaries
         what_you_did_well = list(dict.fromkeys(strengths))[:3]
         keep_practising = list(dict.fromkeys(improvements))[:3]
@@ -951,6 +1063,7 @@ class SubmitQuizView(APIView):
             'subskill_id': quiz.subskill.id if quiz.subskill else None,
             'competency_score_delta': score_delta,
             'new_subskill_score': new_prof_score,
+            'diagnostic_feedback': diagnostic_feedback,
             'what_you_did_well': what_you_did_well or ["Good effort on completing the assessment."],
             'keep_practising': keep_practising or ["Review any challenging questions using the source citations."],
             'detailed_results': detailed_results

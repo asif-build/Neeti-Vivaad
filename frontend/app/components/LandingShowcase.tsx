@@ -12,6 +12,7 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer 
 } from 'recharts';
 import { NeetiHeroShowcase } from './NeetiHeroShowcase';
+import { ReviewsSection } from './ReviewsSection';
 
 const competencyBreakdown = [
   { domain: 'Statistical & Data Science', score: 78, target: 85, color: '#0F766E' },
@@ -525,7 +526,7 @@ export function LandingShowcase() {
                 {/* Subtitle Bar */}
                 <div className="w-full pt-4 mt-3 border-t-2 border-[#111111] flex items-center justify-between text-xs font-mono">
                   <span className="font-bold text-[#111111]">Public Service Learning Network</span>
-                  <span className="text-[#0F766E] font-extrabold">● Active Learners: 1,420+</span>
+                  <span className="text-[#0F766E] font-extrabold">● Peer Collaboration</span>
                 </div>
 
               </div>
@@ -923,6 +924,9 @@ export function LandingShowcase() {
             </div>
 
           </div>
+
+          {/* Community Perspectives & Reviews */}
+          <ReviewsSection />
 
           {/* Final Call to Action Poster */}
           <div className="bg-[#F2A900] text-[#111111] rounded-[28px] border-2 border-[#111111] shadow-brutal-xl p-8 sm:p-14 text-center space-y-6">

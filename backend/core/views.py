@@ -6,6 +6,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from .models import (
     User, UserStatus, OfficialProfile, EmailVerificationToken, PasswordResetToken,
@@ -16,11 +18,23 @@ from .serializers import (
     OfficialSkillProficiencySerializer, CompetencyDomainSerializer
 )
 from .email_service import EmailService
+from .throttling import (
+    RegistrationIPThrottle, LoginIPThrottle, LoginAccountThrottle,
+    VerificationIPThrottle, ResendVerificationIPThrottle, ResendVerificationAccountThrottle,
+    PasswordResetIPThrottle, PasswordResetAccountThrottle, ResumeUploadThrottle
+)
+from .recaptcha import verify_recaptcha
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [RegistrationIPThrottle]
 
     def post(self, request):
+        # 1. Bot protection: Google reCAPTCHA v3
+        captcha_valid, captcha_error = verify_recaptcha(request, expected_action='register')
+        if not captcha_valid:
+            return Response({'error': captcha_error}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
@@ -62,6 +76,7 @@ class RegisterView(APIView):
 
 class VerifyEmailView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [VerificationIPThrottle]
 
     def post(self, request):
         token_str = request.data.get('token')
@@ -102,8 +117,13 @@ class VerifyEmailView(APIView):
 
 class ResendVerificationEmailView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ResendVerificationIPThrottle, ResendVerificationAccountThrottle]
 
     def post(self, request):
+        captcha_valid, captcha_error = verify_recaptcha(request, expected_action='resend_verification')
+        if not captcha_valid:
+            return Response({'error': captcha_error}, status=status.HTTP_400_BAD_REQUEST)
+
         email = request.data.get('email', '').strip().lower()
         if not email:
             return Response({'error': 'Email address is required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -143,8 +163,13 @@ class ResendVerificationEmailView(APIView):
 
 class PasswordResetRequestView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [PasswordResetIPThrottle, PasswordResetAccountThrottle]
 
     def post(self, request):
+        captcha_valid, captcha_error = verify_recaptcha(request, expected_action='password_reset')
+        if not captcha_valid:
+            return Response({'error': captcha_error}, status=status.HTTP_400_BAD_REQUEST)
+
         email = request.data.get('email', '').strip().lower()
         if not email:
             return Response({'error': 'Email address is required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -178,6 +203,7 @@ class PasswordResetRequestView(APIView):
 
 class PasswordResetConfirmView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [PasswordResetIPThrottle]
 
     def post(self, request):
         token_str = request.data.get('token')
@@ -185,9 +211,6 @@ class PasswordResetConfirmView(APIView):
 
         if not token_str or not new_password:
             return Response({'error': 'Token and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if len(new_password) < 6:
-            return Response({'error': 'Password must be at least 6 characters long.'}, status=status.HTTP_400_BAD_REQUEST)
 
         token_obj = PasswordResetToken.objects.filter(token=token_str, is_used=False).first()
         if not token_obj:
@@ -197,6 +220,12 @@ class PasswordResetConfirmView(APIView):
             return Response({'error': 'This password reset link has expired. Please request a new one.'}, status=status.HTTP_400_BAD_REQUEST)
 
         user = token_obj.user
+
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as exc:
+            return Response({'error': exc.messages[0], 'errors': list(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
         user.set_password(new_password)
         user.save()
 
@@ -214,10 +243,17 @@ class PasswordResetConfirmView(APIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginIPThrottle, LoginAccountThrottle]
 
     def post(self, request):
+        # Bot protection check
+        captcha_valid, captcha_error = verify_recaptcha(request, expected_action='login')
+        if not captcha_valid:
+            return Response({'error': captcha_error}, status=status.HTTP_400_BAD_REQUEST)
+
         identifier = request.data.get('email') or request.data.get('username')
         password = request.data.get('password')
+
 
         if not identifier or not password:
             return Response({'error': 'Please provide both email/username and password.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -473,11 +509,18 @@ class SkillGapAnalysisView(APIView):
 
 from .resume_service import extract_text_from_file, analyze_resume, calculate_and_persist_competencies
 import os
+import re
 
 class ResumeUploadView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ResumeUploadThrottle]
 
     def post(self, request):
+        # 1. Bot protection check
+        captcha_valid, captcha_error = verify_recaptcha(request, expected_action='resume_upload')
+        if not captcha_valid:
+            return Response({'error': captcha_error}, status=status.HTTP_400_BAD_REQUEST)
+
         user = request.user
         profile, _ = OfficialProfile.objects.get_or_create(user=user)
 
@@ -497,13 +540,29 @@ class ResumeUploadView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            filename = file_obj.name
+            # Sanitize filename (prevent path traversal or unusual characters)
+            safe_basename = os.path.basename(file_obj.name)
+            clean_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', safe_basename)
+            file_obj.name = clean_filename
+
+            filename = clean_filename
             ext = os.path.splitext(filename)[1].lower()
             if ext not in ['.pdf', '.docx', '.doc', '.txt', '.rtf', '.md']:
                 return Response(
                     {'error': f'Unsupported file type "{ext}". Please upload a PDF, DOCX, or TXT document.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+
+            # Validate magic bytes / signature where appropriate
+            try:
+                peek = file_obj.read(16)
+                file_obj.seek(0)
+                if ext == '.pdf' and not peek.startswith(b'%PDF'):
+                    return Response({'error': 'The uploaded file does not appear to be a valid PDF document.'}, status=status.HTTP_400_BAD_REQUEST)
+                elif ext == '.docx' and not peek.startswith(b'PK\x03\x04'):
+                    return Response({'error': 'The uploaded file does not appear to be a valid DOCX document.'}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception:
+                pass
 
             try:
                 raw_text = extract_text_from_file(file_obj, filename)

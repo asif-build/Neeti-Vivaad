@@ -102,19 +102,19 @@ class DeterministicVivaadEngine:
 
         options = [
             {
-                "id": "opt_safeguards",
-                "label": "Proceed conditionally with mandatory anonymisation and differential privacy safeguards",
-                "summary": "Authorize operational rollout strictly after technical verification of privacy filters and offline field logging."
+                "id": "opt_direct_rollout",
+                "label": f"Enforce standard deployment of {scenario_title} with mandatory grievance and audit logging",
+                "summary": f"Authorize immediate operational rollout under {p1_sec} to deliver citizen benefits without procedural delays."
             },
             {
-                "id": "opt_pilot",
-                "label": "Conduct a 30-day pilot across two representative districts before state-wide adoption",
-                "summary": "Deploy in limited test blocks to stress-test enumerator workflows and refine anomaly detection thresholds."
+                "id": "opt_phased_blocks",
+                "label": f"Authorize a phased implementation of {scenario_title} across high-readiness administrative blocks",
+                "summary": f"Stress-test block-level workflows and staff training under {p2_sec} before authorizing state-wide coverage."
             },
             {
-                "id": "opt_delay",
-                "label": "Pause rollout until comprehensive third-party security audit and staff training conclude",
-                "summary": "Prioritize risk elimination and thorough procedural compliance prior to citizen data integration."
+                "id": "opt_readiness_audit",
+                "label": f"Require technical compliance certification and staff capability validation before activating {scenario_title}",
+                "summary": f"Prioritize verified procedural readiness and technical safeguards under {p3_sec} prior to processing live citizen records."
             }
         ]
 
@@ -223,19 +223,19 @@ class DeterministicVivaadEngine:
 
         options = [
             {
-                "id": "opt_proceed_safeguards",
-                "label": "Proceed conditionally with enhanced oversight and mitigation measures",
-                "summary": "Enact the initiative while embedding dedicated checkpoints, monitoring, and grievance escalation."
+                "id": "opt_direct_deployment",
+                "label": f"Enact direct execution of {scenario_title} with mandatory grievance reporting",
+                "summary": f"Prioritize immediate civic benefit under {scenario_title} while mandating regular compliance monitoring across operational divisions."
             },
             {
-                "id": "opt_pilot_block",
-                "label": "Initiate a localized pilot evaluation before full implementation",
-                "summary": "Evaluate operational outcomes in a controlled sample before committing system-wide resources."
+                "id": "opt_targeted_phasing",
+                "label": f"Adopt a staged rollout of {scenario_title} conditioned on divisional resource readiness",
+                "summary": f"Deploy first in priority administrative units to validate frontline operational feasibility and citizen safeguards."
             },
             {
-                "id": "opt_pause_revise",
-                "label": "Pause to restructure the policy framework and consult public stakeholders",
-                "summary": "Address identified risks and operational ambiguities before issuing final administrative orders."
+                "id": "opt_statutory_review",
+                "label": f"Mandate comprehensive procedural audits and legal alignment prior to notifying {scenario_title}",
+                "summary": f"Resolve statutory uncertainties and resource constraints before binding field teams to implementation timelines."
             }
         ]
 
@@ -390,7 +390,8 @@ class DeterministicVivaadEngine:
         scenario: Any,
         selected_option_label: str,
         reasoning: str,
-        turns: List[Any]
+        turns: List[Any],
+        language: str = "en"
     ) -> Dict[str, Any]:
         """
         Multi-criteria evaluation assessing evidence use, policy reasoning,
@@ -475,6 +476,101 @@ class DeterministicVivaadEngine:
                 "note": "Aligns with official standard provisions regarding mandatory compliance and administrative verification."
             })
 
+        # Structured Considerations (What You Considered)
+        what_you_considered = []
+        if mentions_evidence:
+            what_you_considered.append("Evidence & Statutory Provisions")
+        if mentions_people:
+            what_you_considered.append("Public Impact & Citizen Welfare")
+        if mentions_practicality:
+            what_you_considered.append("Operational Feasibility & Field Delivery")
+        if mentions_risk:
+            what_you_considered.append("Risk Mitigation & Procedural Safeguards")
+        if mentions_ethics:
+            what_you_considered.append("Ethical Trust & Governance Transparency")
+        if len(what_you_considered) < 2:
+            what_you_considered.extend(["Statutory Compliance Mandate", "Administrative Velocity & Service Delivery"])
+
+        # Areas to Think About (Deeper Reflection)
+        areas_to_think_about = []
+        if not mentions_risk:
+            areas_to_think_about.append("Risk management under unexpected operational failures")
+        if not mentions_practicality:
+            areas_to_think_about.append("Long-term institutional implementation & field resourcing")
+        if not mentions_evidence:
+            areas_to_think_about.append("Anchoring administrative orders directly to statutory citations")
+        areas_to_think_about.extend([
+            "Safeguards against procedural dilution during district-level execution",
+            "Establishing continuous feedback loops with affected field teams"
+        ])
+        areas_to_think_about = areas_to_think_about[:3]
+
+        # Criteria Human Explanations
+        criteria_feedback = {
+            "evidence_use": {
+                "label": "Evidence Use",
+                "score": evidence_score,
+                "explanation": "Directly grounded arguments in official guidelines and operational standards." if mentions_evidence else "Policy rationale could cite specific clauses, thresholds, or statutory precedents."
+            },
+            "policy_reasoning": {
+                "label": "Policy Reasoning",
+                "score": reasoning_score,
+                "explanation": "Articulated a coherent administrative trajectory balancing competing trade-offs." if length >= 120 else "A more detailed justification would strengthen procedural defensibility."
+            },
+            "risk_awareness": {
+                "label": "Risk Awareness",
+                "score": risk_score,
+                "explanation": "Anticipated operational failure modes and identified protective safeguards." if mentions_risk else "Include explicit fallback protocols in case initial operational assumptions fail."
+            },
+            "people_impact": {
+                "label": "People Impact",
+                "score": people_score,
+                "explanation": "Evaluated the direct impact on citizen beneficiaries and frontline administrative staff." if mentions_people else "Consider how this decision alters citizen experience and vulnerable household access."
+            },
+            "practicality": {
+                "label": "Practicality",
+                "score": practicality_score,
+                "explanation": "Accounted for operational logistics, training readiness, and realistic timelines." if mentions_practicality else "Outline implementation milestones (timelines, training, and block-level capacity)."
+            },
+            "ethical_consideration": {
+                "label": "Ethical Consideration",
+                "score": ethics_score,
+                "explanation": "Demonstrated awareness of fairness, administrative accountability, and public trust." if mentions_ethics else "Reflect on how public transparency and departmental accountability are safeguarded."
+            }
+        }
+
+        # Reactions from Each Perspective in the Scenario
+        other_perspectives_reaction = []
+        perspectives_qs = getattr(scenario, 'perspectives', None)
+        if perspectives_qs:
+            for p in perspectives_qs.all()[:4]:
+                p_role = p.role.upper()
+                if "DATA" in p_role or "PRIVACY" in p_role or "LEGAL" in p_role:
+                    reaction_text = (
+                        f"Notes your approach to '{selected_option_label}'. Emphasizes that technical anonymisation audits "
+                        f"and strict statutory compliance must be maintained in writing before operational rollout."
+                    )
+                elif "FIELD" in p_role or "OPERAT" in p_role or "SURVEY" in p_role:
+                    reaction_text = (
+                        f"Acknowledges the direction of '{selected_option_label}'. Urges that field staff are equipped with clear, "
+                        f"offline-ready workflows and realistic operational targets rather than punitive quotas."
+                    )
+                elif "COLLECTOR" in p_role or "DIRECTOR" in p_role or "MAGISTRATE" in p_role:
+                    reaction_text = (
+                        f"Supports decisive action under '{selected_option_label}'. Stresses the importance of keeping welfare "
+                        f"disbursal schedules predictable while monitoring inter-block variance."
+                    )
+                else:
+                    reaction_text = (
+                        f"Observes that '{selected_option_label}' navigates departmental priorities. Advises quarterly reviews "
+                        f"to ensure the policy fulfills its intended civic objective."
+                    )
+                other_perspectives_reaction.append({
+                    "role": p.role,
+                    "name": p.name,
+                    "reaction": reaction_text
+                })
+
         # Competency deltas (+4.0 to +8.0 points for strong, thoughtful reasoning)
         competency_deltas = {}
         if overall_score >= 80:
@@ -486,9 +582,94 @@ class DeterministicVivaadEngine:
         else:
             competency_deltas["POLICY_REASONING"] = 2.0
 
+        # User reasoning citation quote snippet
+        reasoning_snippet = clean_reasoning[:120].strip()
+        if len(clean_reasoning) > 120:
+            reasoning_snippet += "..."
+
+        # 1. YOUR DECISION
+        your_decision = selected_option_label
+
+        # 2. WHY YOUR REASONING WORKS (Quoting user's actual words)
+        if mentions_evidence or mentions_risk or mentions_people:
+            why_your_reasoning_works = (
+                f"Your reasoning works because you emphasized that \"{reasoning_snippet}\", recognizing that public administration "
+                f"under {scenario.title} cannot rely on assumptions; it requires balancing implementation momentum against enforceable safeguards."
+            )
+        else:
+            why_your_reasoning_works = (
+                f"Your reasoning works because choosing to \"{selected_option_label}\" provides unambiguous administrative direction "
+                f"on {scenario.title}, establishing a definite operational stance."
+            )
+
+        # 3. WHAT YOU CONSIDERED WELL
+        what_you_considered_well = strengths
+
+        # 4. ONE THING TO THINK ABOUT
+        if not mentions_risk:
+            one_thing_to_think_about = "Think about establishing fallback protocols in case initial operational assumptions or network connectivity fail."
+        elif not mentions_practicality:
+            one_thing_to_think_about = "Think about block-level staff workload and whether frontline enumerators have adequate training buffer before day one."
+        elif not mentions_people:
+            one_thing_to_think_about = "Think about how vulnerable households with limited digital literacy will access administrative grievance redressal."
+        else:
+            one_thing_to_think_about = "Think about how third-party quality audits after 90 days will verify that procedural compliance remains intact."
+
+        # 5. ANOTHER PERSPECTIVE
+        if other_perspectives_reaction:
+            p_first = other_perspectives_reaction[0]
+            another_perspective = f"{p_first['role']} ({p_first['name']}): \"{p_first['reaction']}\""
+        else:
+            another_perspective = "Frontline Field Officers: Implementation clarity and realistic operational targets build public confidence faster than punitive directives."
+
+        # 6. WHAT THIS TEACHES YOU
+        what_this_teaches_you = (
+            f"Public administration rarely offers frictionless decisions. Defensible policy leadership is demonstrated "
+            f"not by avoiding trade-offs, but by making conscious choices, justifying them with verifiable standards, and protecting the vulnerable."
+        )
+
+        # 7. NEXT STEP
+        next_step = (
+            f"Draft an operational circular for {scenario.title} specifying verification protocols, staff responsibilities, "
+            f"and a scheduled 60-day review milestone with affected district teams."
+        )
+
+        # Conversational, plain-language feedback for ordinary citizens
+        is_hindi = str(language).lower().startswith('hi') or any('\u0900' <= char <= '\u097F' for char in clean_reasoning)
+        if is_hindi:
+            makes_sense_because = (
+                f"आपका '{selected_option_label}' चुनना इसलिए समझ में आता है क्योंकि आपने लिखा: \"{reasoning_snippet}\"। "
+                f"जमीनी हकीकत और लोगों की सुविधा दोनों को ध्यान में रखकर निर्णय लेने से व्यवस्था सुचारू रूप से आगे बढ़ती है।"
+            )
+            think_about_this_too = [
+                "उन परिवारों या क्षेत्रों पर क्या असर पड़ेगा जहाँ बुनियादी तकनीकी सुविधाएं या नेटवर्क कमजोर हैं?",
+                "शुरुआती चरण में यदि किसी तकनीकी या प्रशासनिक त्रुटि की शिकायत आती है, तो उसका त्वरित निवारण कैसे होगा?"
+            ]
+            another_view = another_perspective
+        else:
+            makes_sense_because = why_your_reasoning_works
+            think_about_this_too = areas_to_think_about[:2]
+            another_view = another_perspective
+
         return {
             "overall_score": overall_score,
+            # The 7 required production decision feedback keys
+            "your_decision": your_decision,
+            "why_your_reasoning_works": why_your_reasoning_works,
+            "what_you_considered_well": what_you_considered_well,
+            "one_thing_to_think_about": one_thing_to_think_about,
+            "another_perspective": another_perspective,
+            "what_this_teaches_you": what_this_teaches_you,
+            "next_step": next_step,
+            # Backward-compatible UI keys
+            "makes_sense_because": makes_sense_because,
+            "think_about_this_too": think_about_this_too,
+            "another_view": another_view,
             "criteria_scores": criteria_scores,
+            "criteria_feedback": criteria_feedback,
+            "what_you_considered": what_you_considered,
+            "areas_to_think_about": areas_to_think_about,
+            "other_perspectives_reaction": other_perspectives_reaction,
             "what_you_did_well": strengths,
             "try_next_time": improvements,
             "tradeoffs_analysis": tradeoffs_analysis,
@@ -631,9 +812,10 @@ Return JSON with "title", "situation", "decision_question", "objective", "constr
         scenario: Any,
         selected_option_label: str,
         reasoning: str,
-        turns: List[Any]
+        turns: List[Any],
+        language: str = "en"
     ) -> Dict[str, Any]:
-        return DeterministicVivaadEngine.evaluate_decision(scenario, selected_option_label, reasoning, turns)
+        return DeterministicVivaadEngine.evaluate_decision(scenario, selected_option_label, reasoning, turns, language=language)
 
 
 def get_vivaad_engine():

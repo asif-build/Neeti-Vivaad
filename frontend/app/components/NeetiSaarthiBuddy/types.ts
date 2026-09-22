@@ -10,6 +10,8 @@ export interface BuddyMessage {
 
 export type MascotState = 'idle' | 'greeting' | 'thinking' | 'listening' | 'speaking' | 'success' | 'error';
 
+export type VoiceModeState = 'IDLE' | 'LISTENING' | 'PROCESSING' | 'SPEAKING';
+
 export interface TourStep {
   step: number;
   title: string;
@@ -50,8 +52,10 @@ export interface BuddyContextResponse {
       difficulty: string;
     }>;
     page_intent: string;
+    subtitle?: string;
     current_route: string;
   };
+  subtitle?: string;
   greeting: string;
   suggestions: string[];
   onboarding_tour_completed: boolean;

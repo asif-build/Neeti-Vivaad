@@ -43,6 +43,7 @@ export const NeetiSaarthiBuddy: React.FC = () => {
         currentRoute={currentRoute}
         initialGreeting={contextData?.greeting}
         initialSuggestions={contextData?.suggestions}
+        subtitle={contextData?.subtitle}
       />
 
       {/* 2. Persistent Floating Buddy Button */}
