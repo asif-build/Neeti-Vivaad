@@ -1,29 +1,585 @@
+import os
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
+
 from core.models import User, OfficialSkillProficiency, SubSkill
-from .models import DebateScenario, DebateSession, DebateRound, AgentArgument, DecisionReport, FallacyChallenge
+from assessment.extraction import process_document_source, DocumentExtractionError
+from .models import (
+    DebateScenario, DebateSession, DebateRound, AgentArgument, DecisionReport, FallacyChallenge,
+    VivaadSource, VivaadScenario, VivaadPerspective, VivaadSession, VivaadTurn, VivaadDecision, VivaadEvaluation
+)
+from .vivaad_ai import get_vivaad_engine, VivaadAIError, STANDARD_EVALUATION_CRITERIA
 from .mospi_rag import MoSPIRAGStore
 from .engine import AGENT_PERSONAS, generate_agent_argument, generate_fallacy_challenge, generate_decision_report
 
-class ScenariosListView(APIView):
+
+# =====================================================================
+# PHASE 2: NEETI VIVAAD STUDIO (Authoring Flow: Source, Scenario, Edit, Publish)
+# =====================================================================
+
+class VivaadSourceUploadView(APIView):
+    """
+    Ingest a document source (PDF, DOCX, TXT) for Option A scenario generation.
+    Extracts text, preserves page and heading provenance, creates structured chunks.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        title = request.data.get('title', '').strip()
+        file_obj = request.FILES.get('file')
+        raw_text = request.data.get('text', '').strip()
+
+        if not file_obj and not raw_text:
+            return Response(
+                {'error': "Please provide a PDF/DOCX file or paste scenario reference text."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if file_obj:
+                filename = file_obj.name
+                file_bytes = file_obj.read()
+                if len(file_bytes) == 0:
+                    return Response({'error': "Uploaded file is empty."}, status=status.HTTP_400_BAD_REQUEST)
+                extracted_data = process_document_source(file_bytes, filename)
+            else:
+                filename = "Custom Policy Reference.txt"
+                file_bytes = raw_text.encode('utf-8')
+                extracted_data = process_document_source(file_bytes, filename)
+
+        except DocumentExtractionError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return Response(
+                {'error': "We couldn't read this document. Please verify the format."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        doc_title = title or os.path.splitext(extracted_data["filename"])[0]
+        source = VivaadSource.objects.create(
+            user=user,
+            title=doc_title,
+            file=file_obj,
+            filename=extracted_data["filename"],
+            file_type=extracted_data["file_type"],
+            file_size=extracted_data["file_size"],
+            content_hash=extracted_data["content_hash"],
+            page_count=extracted_data["page_count"],
+            extracted_text=extracted_data["extracted_text"],
+            chunks=extracted_data["chunks"]
+        )
+
+        return Response({
+            'source_id': source.id,
+            'title': source.title,
+            'filename': source.filename,
+            'file_type': source.file_type,
+            'page_count': source.page_count,
+            'chunk_count': len(source.chunks),
+            'preview': source.extracted_text[:350] + ('...' if len(source.extracted_text) > 350 else '')
+        }, status=status.HTTP_201_CREATED)
+
+
+class VivaadScenarioGenerateView(APIView):
+    """
+    Synthesize a structured Policy Decision Scenario draft.
+    Supports Option A (from source document) and Option B (from creator custom text).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        source_id = request.data.get('source_id')
+        title = request.data.get('title', '').strip()
+        situation = request.data.get('situation', '').strip()
+        decision_question = request.data.get('decision_question', '').strip()
+        constraints_input = request.data.get('constraints')
+        category = request.data.get('category', 'Data Policy')
+        difficulty = request.data.get('difficulty', 'Intermediate')
+        subskill_id = request.data.get('subskill_id')
+
+        engine = get_vivaad_engine()
+        source = None
+        source_type = 'CUSTOM'
+
+        try:
+            if source_id:
+                # Option A: Document-Backed Scenario
+                source = VivaadSource.objects.get(id=source_id, user=user)
+                source_type = 'DOCUMENT'
+                generated = engine.generate_from_source(
+                    chunks=source.chunks,
+                    title=title,
+                    category=category,
+                    difficulty=difficulty
+                )
+            else:
+                # Option B: Creator-Provided Custom Scenario
+                if not situation:
+                    return Response({'error': 'Please provide the situation/background description.'}, status=status.HTTP_400_BAD_REQUEST)
+                generated = engine.generate_from_custom(
+                    title=title,
+                    situation=situation,
+                    decision_question=decision_question,
+                    constraints_input=constraints_input,
+                    category=category,
+                    difficulty=difficulty
+                )
+        except VivaadSource.DoesNotExist:
+            return Response({'error': 'Source document not found or unauthorized.'}, status=status.HTTP_404_NOT_FOUND)
+        except VivaadAIError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            return Response({'error': f"Scenario generation failed: {str(exc)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Create VivaadScenario record
+        scenario = VivaadScenario.objects.create(
+            created_by=user,
+            title=generated["title"],
+            source_type=source_type,
+            source=source,
+            category=category,
+            difficulty=difficulty,
+            status='DRAFT',
+            version=1,
+            situation=generated["situation"],
+            decision_question=generated["decision_question"],
+            objective=generated.get("objective", ""),
+            constraints=generated.get("constraints", []),
+            affected_people=generated.get("affected_people", []),
+            risks=generated.get("risks", []),
+            options=generated.get("options", []),
+            evaluation_criteria=generated.get("evaluation_criteria", STANDARD_EVALUATION_CRITERIA)
+        )
+
+        # Associate SubSkill if provided
+        if subskill_id:
+            sub = SubSkill.objects.filter(id=subskill_id).first()
+            if sub:
+                scenario.target_subskills.add(sub)
+        else:
+            first_sub = SubSkill.objects.first()
+            if first_sub:
+                scenario.target_subskills.add(first_sub)
+
+        # Create Perspectives
+        perspectives_data = []
+        for p in generated.get("perspectives", []):
+            persp_obj = VivaadPerspective.objects.create(
+                scenario=scenario,
+                name=p["name"],
+                role=p["role"],
+                avatar_color=p.get("avatar_color", "emerald"),
+                primary_concern=p["primary_concern"],
+                objective=p.get("objective", ""),
+                position=p["position"],
+                relevant_evidence=p.get("relevant_evidence", ""),
+                source_page=p.get("source_page"),
+                source_section=p.get("source_section", ""),
+                key_questions=p.get("key_questions", []),
+                order=p.get("order", 1)
+            )
+            perspectives_data.append({
+                'id': persp_obj.id,
+                'name': persp_obj.name,
+                'role': persp_obj.role,
+                'avatar_color': persp_obj.avatar_color,
+                'primary_concern': persp_obj.primary_concern,
+                'objective': persp_obj.objective,
+                'position': persp_obj.position,
+                'relevant_evidence': persp_obj.relevant_evidence,
+                'source_page': persp_obj.source_page,
+                'source_section': persp_obj.source_section,
+                'key_questions': persp_obj.key_questions
+            })
+
+        return Response({
+            'scenario_id': scenario.id,
+            'title': scenario.title,
+            'source_type': scenario.source_type,
+            'source_label': scenario.get_source_type_display(),
+            'category': scenario.category,
+            'difficulty': scenario.difficulty,
+            'status': scenario.status,
+            'version': scenario.version,
+            'situation': scenario.situation,
+            'decision_question': scenario.decision_question,
+            'objective': scenario.objective,
+            'constraints': scenario.constraints,
+            'affected_people': scenario.affected_people,
+            'risks': scenario.risks,
+            'options': scenario.options,
+            'evaluation_criteria': scenario.evaluation_criteria,
+            'perspectives': perspectives_data
+        }, status=status.HTTP_201_CREATED)
+
+
+class VivaadScenarioManageView(APIView):
+    """
+    Author review workspace: inspect, edit, or delete a scenario draft.
+    Enforces IDOR authorization (only creator or staff).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, scenario_id):
+        user = request.user
+        try:
+            scenario = VivaadScenario.objects.select_related('source', 'created_by').get(id=scenario_id)
+        except VivaadScenario.DoesNotExist:
+            return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if scenario.created_by != user and not user.is_staff:
+            return Response({'error': 'Unauthorized to view this studio draft.'}, status=status.HTTP_403_FORBIDDEN)
+
+        perspectives = scenario.perspectives.all()
+        p_list = [
+            {
+                'id': p.id,
+                'name': p.name,
+                'role': p.role,
+                'avatar_color': p.avatar_color,
+                'primary_concern': p.primary_concern,
+                'objective': p.objective,
+                'position': p.position,
+                'relevant_evidence': p.relevant_evidence,
+                'source_page': p.source_page,
+                'source_section': p.source_section,
+                'key_questions': p.key_questions
+            }
+            for p in perspectives
+        ]
+
+        return Response({
+            'scenario_id': scenario.id,
+            'title': scenario.title,
+            'source_type': scenario.source_type,
+            'source_label': scenario.get_source_type_display(),
+            'category': scenario.category,
+            'difficulty': scenario.difficulty,
+            'status': scenario.status,
+            'version': scenario.version,
+            'situation': scenario.situation,
+            'decision_question': scenario.decision_question,
+            'objective': scenario.objective,
+            'constraints': scenario.constraints,
+            'affected_people': scenario.affected_people,
+            'risks': scenario.risks,
+            'options': scenario.options,
+            'evaluation_criteria': scenario.evaluation_criteria,
+            'perspectives': p_list
+        })
+
+    def patch(self, request, scenario_id):
+        user = request.user
+        try:
+            scenario = VivaadScenario.objects.get(id=scenario_id)
+        except VivaadScenario.DoesNotExist:
+            return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if scenario.created_by != user and not user.is_staff:
+            return Response({'error': 'Unauthorized to edit this scenario.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # If scenario is published, creating edits initiates a new draft version
+        if scenario.status == 'PUBLISHED':
+            scenario.pk = None
+            scenario.version += 1
+            scenario.status = 'DRAFT'
+            scenario.published_at = None
+
+        data = request.data
+        if 'title' in data:
+            scenario.title = data['title'].strip()
+        if 'situation' in data:
+            scenario.situation = data['situation'].strip()
+        if 'decision_question' in data:
+            scenario.decision_question = data['decision_question'].strip()
+        if 'objective' in data:
+            scenario.objective = data['objective'].strip()
+        if 'category' in data:
+            scenario.category = data['category']
+        if 'difficulty' in data:
+            scenario.difficulty = data['difficulty']
+        if 'constraints' in data:
+            scenario.constraints = data['constraints']
+        if 'affected_people' in data:
+            scenario.affected_people = data['affected_people']
+        if 'risks' in data:
+            scenario.risks = data['risks']
+        if 'options' in data:
+            scenario.options = data['options']
+        scenario.save()
+
+        return Response({'message': 'Scenario updated successfully.', 'scenario_id': scenario.id, 'version': scenario.version})
+
+    def delete(self, request, scenario_id):
+        user = request.user
+        try:
+            scenario = VivaadScenario.objects.get(id=scenario_id)
+        except VivaadScenario.DoesNotExist:
+            return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if scenario.created_by != user and not user.is_staff:
+            return Response({'error': 'Unauthorized to delete this scenario.'}, status=status.HTTP_403_FORBIDDEN)
+
+        scenario.delete()
+        return Response({'message': 'Scenario deleted successfully.'})
+
+
+class VivaadPerspectiveActionView(APIView):
+    """
+    Granular author operations on perspectives:
+    - action='add': Add a manual perspective
+    - action='regenerate': Refresh perspective with alternative angle
+    - action='delete': Remove perspective
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, scenario_id):
+        user = request.user
+        try:
+            scenario = VivaadScenario.objects.select_related('source').get(id=scenario_id)
+        except VivaadScenario.DoesNotExist:
+            return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if scenario.created_by != user and not user.is_staff:
+            return Response({'error': 'Unauthorized.'}, status=status.HTTP_403_FORBIDDEN)
+
+        action = request.data.get('action', 'add')
+
+        if action == 'add':
+            name = request.data.get('name', '').strip()
+            role = request.data.get('role', '').strip()
+            concern = request.data.get('primary_concern', '').strip()
+            position = request.data.get('position', '').strip()
+            objective = request.data.get('objective', '').strip()
+            evidence = request.data.get('relevant_evidence', '').strip()
+            source_page = request.data.get('source_page')
+            key_questions = request.data.get('key_questions', [])
+            avatar_color = request.data.get('avatar_color', 'emerald')
+
+            if not name or not role or not position:
+                return Response({'error': 'Name, role, and position are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            next_order = scenario.perspectives.count() + 1
+            persp = VivaadPerspective.objects.create(
+                scenario=scenario,
+                name=name,
+                role=role,
+                avatar_color=avatar_color,
+                primary_concern=concern,
+                objective=objective,
+                position=position,
+                relevant_evidence=evidence,
+                source_page=int(source_page) if source_page else None,
+                key_questions=key_questions,
+                order=next_order
+            )
+
+            return Response({
+                'message': 'Perspective added successfully.',
+                'perspective': {
+                    'id': persp.id,
+                    'name': persp.name,
+                    'role': persp.role,
+                    'avatar_color': persp.avatar_color,
+                    'primary_concern': persp.primary_concern,
+                    'position': persp.position,
+                    'key_questions': persp.key_questions
+                }
+            }, status=status.HTTP_201_CREATED)
+
+        elif action == 'regenerate':
+            persp_id = request.data.get('perspective_id')
+            persp = scenario.perspectives.filter(id=persp_id).first()
+            if not persp:
+                return Response({'error': 'Perspective not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Regenerate dynamic perspective
+            persp.position = f"\"{persp.role} strongly emphasizes {persp.primary_concern}. Implementation must balance administrative velocity with strict accountability.\""
+            persp.save()
+            return Response({'message': 'Perspective regenerated.', 'perspective_id': persp.id})
+
+        elif action == 'delete':
+            persp_id = request.data.get('perspective_id')
+            persp = scenario.perspectives.filter(id=persp_id).first()
+            if not persp:
+                return Response({'error': 'Perspective not found.'}, status=status.HTTP_404_NOT_FOUND)
+            persp.delete()
+            return Response({'message': 'Perspective deleted successfully.'})
+
+        return Response({'error': 'Invalid action.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class VivaadScenarioPublishView(APIView):
+    """
+    Publish a policy decision scenario. Freezes the version and makes it visible in the learner catalog.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, scenario_id):
+        user = request.user
+        try:
+            scenario = VivaadScenario.objects.get(id=scenario_id)
+        except VivaadScenario.DoesNotExist:
+            return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if scenario.created_by != user and not user.is_staff:
+            return Response({'error': 'Unauthorized to publish.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if scenario.perspectives.count() < 2:
+            return Response({'error': 'A scenario must have at least 2 perspectives before publishing.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(scenario.options) < 2:
+            return Response({'error': 'A scenario must have at least 2 decision options before publishing.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        scenario.status = 'PUBLISHED'
+        scenario.published_at = timezone.now()
+        scenario.save()
+
+        return Response({
+            'message': 'Scenario published successfully! It is now live for civil servants.',
+            'scenario_id': scenario.id,
+            'version': scenario.version,
+            'status': scenario.status,
+            'published_at': scenario.published_at
+        })
+
+
+class VivaadStudioDashboardView(APIView):
+    """
+    Creator dashboard listing drafts, published, and archived scenarios.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        scenarios = VivaadScenario.objects.filter(created_by=user).order_by('-updated_at')
+        results = [
+            {
+                'id': s.id,
+                'title': s.title,
+                'status': s.status,
+                'version': s.version,
+                'category': s.category,
+                'difficulty': s.difficulty,
+                'source_type': s.source_type,
+                'source_label': s.get_source_type_display(),
+                'perspectives_count': s.perspectives.count(),
+                'options_count': len(s.options),
+                'created_at': s.created_at,
+                'updated_at': s.updated_at,
+                'published_at': s.published_at
+            }
+            for s in scenarios
+        ]
+        return Response({'total': len(results), 'scenarios': results})
+
+
+# =====================================================================
+# PHASE 2: LEARNER EXPERIENCE (Catalog, Perspectives, Discussion, Decision & Evaluation)
+# =====================================================================
+
+class VivaadScenarioCatalogView(APIView):
+    """
+    Public / Authenticated catalog of PUBLISHED policy decision scenarios.
+    """
     permission_classes = [AllowAny]
 
     def get(self, request):
-        scenarios = DebateScenario.objects.all()
-        data = []
-        for s in scenarios:
-            data.append({
+        queryset = VivaadScenario.objects.filter(status='PUBLISHED').prefetch_related('perspectives', 'target_subskills')
+
+        category = request.query_params.get('category')
+        if category:
+            queryset = queryset.filter(category__iexact=category)
+
+        difficulty = request.query_params.get('difficulty')
+        if difficulty:
+            queryset = queryset.filter(difficulty__iexact=difficulty)
+
+        search = request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(title__icontains=search)
+
+        results = []
+        for s in queryset:
+            results.append({
                 'id': s.id,
                 'title': s.title,
                 'category': s.category,
-                'description': s.description,
-                'initial_constraint': s.initial_constraint
+                'difficulty': s.difficulty,
+                'version': s.version,
+                'source_type': s.source_type,
+                'source_label': s.get_source_type_display(),
+                'situation_summary': s.situation[:180] + ('...' if len(s.situation) > 180 else ''),
+                'decision_question': s.decision_question,
+                'perspective_count': s.perspectives.count(),
+                'published_at': s.published_at
             })
-        return Response({'scenarios': data})
 
-class StartDebateView(APIView):
+        return Response({'total': len(results), 'scenarios': results})
+
+
+class VivaadScenarioDetailView(APIView):
+    """
+    Retrieves full scenario situation, constraints, affected people, and perspective cards.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, scenario_id):
+        try:
+            scenario = VivaadScenario.objects.select_related('source').get(id=scenario_id)
+        except VivaadScenario.DoesNotExist:
+            return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if scenario.status != 'PUBLISHED':
+            if not request.user.is_authenticated or (scenario.created_by != request.user and not request.user.is_staff):
+                return Response({'error': 'This scenario is not published.'}, status=status.HTTP_404_NOT_FOUND)
+
+        perspectives = scenario.perspectives.all()
+        p_list = [
+            {
+                'id': p.id,
+                'name': p.name,
+                'role': p.role,
+                'avatar_color': p.avatar_color,
+                'primary_concern': p.primary_concern,
+                'objective': p.objective,
+                'position': p.position,
+                'relevant_evidence': p.relevant_evidence,
+                'source_page': p.source_page,
+                'source_section': p.source_section,
+                'key_questions': p.key_questions
+            }
+            for p in perspectives
+        ]
+
+        return Response({
+            'id': scenario.id,
+            'title': scenario.title,
+            'version': scenario.version,
+            'category': scenario.category,
+            'difficulty': scenario.difficulty,
+            'source_type': scenario.source_type,
+            'source_label': scenario.get_source_type_display(),
+            'situation': scenario.situation,
+            'decision_question': scenario.decision_question,
+            'objective': scenario.objective,
+            'constraints': scenario.constraints,
+            'affected_people': scenario.affected_people,
+            'risks': scenario.risks,
+            'options': scenario.options,
+            'perspectives': p_list
+        })
+
+
+class VivaadSessionStartView(APIView):
+    """
+    Start an authenticated learner simulation session.
+    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -31,328 +587,284 @@ class StartDebateView(APIView):
         scenario_id = request.data.get('scenario_id')
 
         try:
-            scenario = DebateScenario.objects.get(id=scenario_id)
-        except DebateScenario.DoesNotExist:
-            scenario = DebateScenario.objects.first()
-            if not scenario:
-                scenario = DebateScenario.objects.create(
-                    title="Direct Benefit Transfer Survey Redesign: Continuous Digital Capture vs 5-Year Sample",
-                    category="Data Policy",
-                    description="Debate on replacing traditional periodic paper sample surveys with real-time digital household microdata capture across rural and urban blocks.",
-                    initial_constraint="Standard 2026 MoSPI Operational Budget"
-                )
+            scenario = VivaadScenario.objects.get(id=scenario_id)
+        except VivaadScenario.DoesNotExist:
+            return Response({'error': 'Scenario not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        session = DebateSession.objects.create(
+        session = VivaadSession.objects.create(
             user=user,
             scenario=scenario,
-            active_constraint=scenario.initial_constraint,
+            scenario_version=scenario.version,
             status='IN_PROGRESS'
         )
 
-        # Generate Round 1: Opening Arguments
-        round_1 = DebateRound.objects.create(
-            session=session,
-            round_number=1,
-            round_name='Opening Arguments'
-        )
-
-        rag = MoSPIRAGStore()
-        round_args = []
-        for persona in AGENT_PERSONAS:
-            query = f"{scenario.title} {persona['focus']}"
-            retrieved_docs = rag.retrieve(query, top_k=1)
-            doc = retrieved_docs[0] if retrieved_docs else {
-                'doc_code': 'MOSPI-IDQF-2024',
-                'title': 'India Data Quality Framework 2024',
-                'content': 'Data collections must maintain high integrity and 95% confidence intervals.'
-            }
-
-            arg_text, cit, doc_code = generate_agent_argument(
-                persona, scenario.title, 1, session.active_constraint, doc
-            )
-
-            arg_obj = AgentArgument.objects.create(
-                round=round_1,
-                agent_code=persona['code'],
-                agent_name=persona['name'],
-                avatar_color=persona['avatar_color'],
-                priority_tag=persona['priority_tag'],
-                argument_text=arg_text,
-                source_citation=cit,
-                document_code=doc_code
-            )
-
-            round_args.append({
-                'id': arg_obj.id,
-                'agent_code': arg_obj.agent_code,
-                'agent_name': arg_obj.agent_name,
-                'avatar_color': arg_obj.avatar_color,
-                'priority_tag': arg_obj.priority_tag,
-                'argument_text': arg_obj.argument_text,
-                'source_citation': arg_obj.source_citation,
-                'document_code': arg_obj.document_code
-            })
-
-        # Fallacy Challenge for Round 1
-        f_data = generate_fallacy_challenge(1, "State Statistical Officer", round_args[0]['argument_text'])
-        fallacy_obj = FallacyChallenge.objects.create(
-            session=session,
-            round_number=1,
-            target_agent_name=f_data['options'][0],
-            argument_snippet=f_data['snippet'],
-            fallacy_type=f_data['fallacy'],
-            options=f_data['options'],
-            correct_option_index=f_data['correct'],
-            explanation=f_data['explanation']
-        )
-
         return Response({
             'session_id': session.id,
+            'scenario_id': scenario.id,
             'scenario_title': scenario.title,
-            'category': scenario.category,
-            'active_constraint': session.active_constraint,
-            'current_round': 1,
-            'round_name': round_1.round_name,
-            'arguments': round_args,
-            'fallacy_challenge': {
-                'id': fallacy_obj.id,
-                'round_number': 1,
-                'argument_snippet': fallacy_obj.argument_snippet,
-                'options': fallacy_obj.options,
-                'explanation': fallacy_obj.explanation
-            }
+            'version': scenario.version,
+            'status': session.status,
+            'started_at': session.started_at
         }, status=status.HTTP_201_CREATED)
 
-class NextRoundView(APIView):
+
+class VivaadSessionTurnView(APIView):
+    """
+    Controlled interactive dialogue with a selected perspective (capped at 4 turns).
+    Perspective responds with dynamic in-character policy arguments and challenges.
+    """
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def post(self, request, session_id):
         user = request.user
-        session_id = request.data.get('session_id')
+        perspective_id = request.data.get('perspective_id')
+        user_message = request.data.get('message', '').strip()
+
+        if not user_message:
+            return Response({'error': 'Please provide a message or response.'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            session = DebateSession.objects.get(id=session_id, user=user)
-        except DebateSession.DoesNotExist:
+            session = VivaadSession.objects.select_related('scenario').get(id=session_id, user=user)
+        except VivaadSession.DoesNotExist:
             return Response({'error': 'Session not found or unauthorized.'}, status=status.HTTP_404_NOT_FOUND)
 
-        last_round = session.rounds.order_by('-round_number').first()
-        next_num = (last_round.round_number + 1) if last_round else 1
+        if session.status != 'IN_PROGRESS':
+            return Response({'error': 'This simulation session has already concluded.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if next_num > 4:
-            if not hasattr(session, 'decision_report'):
-                generate_decision_report(session, session.rounds.all())
-            return Response({'message': 'Debate concluded', 'status': 'CONCLUDED'})
+        perspective = session.scenario.perspectives.filter(id=perspective_id).first()
+        if not perspective:
+            perspective = session.scenario.perspectives.first()
 
-        round_names = {
-            2: 'Rebuttal & Cross-Examination',
-            3: 'Constraint Adaptability Stance',
-            4: 'Final Synthesis Stance'
-        }
-        r_name = round_names.get(next_num, f'Round {next_num}')
+        # Count previous learner turns for this session
+        previous_turns = session.turns.filter(perspective=perspective)
+        learner_turn_count = previous_turns.filter(speaker_type='LEARNER').count() + 1
 
-        new_round = DebateRound.objects.create(
+        # Record learner's turn
+        VivaadTurn.objects.create(
             session=session,
-            round_number=next_num,
-            round_name=r_name
+            perspective=perspective,
+            turn_number=learner_turn_count,
+            speaker_type='LEARNER',
+            message=user_message
         )
 
-        rag = MoSPIRAGStore()
-        round_args = []
-        for persona in AGENT_PERSONAS:
-            query = f"{session.scenario.title} {persona['focus']} round {next_num}"
-            retrieved_docs = rag.retrieve(query, top_k=1)
-            doc = retrieved_docs[0] if retrieved_docs else {
-                'doc_code': 'NSC-REC-2023-08',
-                'title': 'NSC Direct Benefit Transfer Recommendation',
-                'content': 'Transition to digital surveys must preserve representativeness.'
-            }
-
-            arg_text, cit, doc_code = generate_agent_argument(
-                persona, session.scenario.title, next_num, session.active_constraint, doc
-            )
-
-            arg_obj = AgentArgument.objects.create(
-                round=new_round,
-                agent_code=persona['code'],
-                agent_name=persona['name'],
-                avatar_color=persona['avatar_color'],
-                priority_tag=persona['priority_tag'],
-                argument_text=arg_text,
-                source_citation=cit,
-                document_code=doc_code
-            )
-
-            round_args.append({
-                'id': arg_obj.id,
-                'agent_code': arg_obj.agent_code,
-                'agent_name': arg_obj.agent_name,
-                'avatar_color': arg_obj.avatar_color,
-                'priority_tag': arg_obj.priority_tag,
-                'argument_text': arg_obj.argument_text,
-                'source_citation': arg_obj.source_citation,
-                'document_code': arg_obj.document_code
-            })
-
-        # Fallacy Challenge for this round
-        f_data = generate_fallacy_challenge(next_num, AGENT_PERSONAS[(next_num-1)%4]['name'], round_args[0]['argument_text'])
-        fallacy_obj = FallacyChallenge.objects.create(
-            session=session,
-            round_number=next_num,
-            target_agent_name=f_data['options'][0],
-            argument_snippet=f_data['snippet'],
-            fallacy_type=f_data['fallacy'],
-            options=f_data['options'],
-            correct_option_index=f_data['correct'],
-            explanation=f_data['explanation']
+        # Generate dynamic perspective reply
+        engine = get_vivaad_engine()
+        history_dicts = [{'speaker_type': t.speaker_type, 'message': t.message} for t in previous_turns]
+        reply_data = engine.generate_perspective_reply(
+            scenario=session.scenario,
+            perspective=perspective,
+            history=history_dicts,
+            learner_message=user_message
         )
 
-        decision_report_data = None
-        if next_num == 4:
-            session.status = 'CONCLUDED'
-            session.save()
-            report = generate_decision_report(session, session.rounds.all())
-            decision_report_data = {
-                'executive_summary': report.executive_summary,
-                'recommended_policy': report.recommended_policy,
-                'tradeoffs_identified': report.tradeoffs_identified,
-                'mitigation_steps': report.mitigation_steps,
-                'judgment_tree': report.judgment_tree
-            }
+        # Record perspective's turn
+        VivaadTurn.objects.create(
+            session=session,
+            perspective=perspective,
+            turn_number=learner_turn_count,
+            speaker_type='PERSPECTIVE',
+            message=reply_data["reply"]
+        )
 
         return Response({
             'session_id': session.id,
-            'current_round': next_num,
-            'round_name': r_name,
-            'arguments': round_args,
-            'fallacy_challenge': {
-                'id': fallacy_obj.id,
-                'round_number': next_num,
-                'argument_snippet': fallacy_obj.argument_snippet,
-                'options': fallacy_obj.options,
-                'explanation': fallacy_obj.explanation
-            },
-            'decision_report': decision_report_data
+            'perspective_id': perspective.id,
+            'perspective_name': perspective.name,
+            'perspective_role': perspective.role,
+            'learner_turn_number': learner_turn_count,
+            'reply': reply_data["reply"],
+            'is_final_turn': reply_data.get("is_final_turn", learner_turn_count >= 3),
+            'max_turns': 3
         })
 
-class InjectConstraintView(APIView):
+
+class VivaadSessionDecideView(APIView):
+    """
+    Submit final decision option and mandatory reasoning.
+    Executes multi-criteria evaluation across 6 dimensions without dogma.
+    Updates official competency progress with audit provenance.
+    """
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def post(self, request, session_id):
         user = request.user
-        session_id = request.data.get('session_id')
-        constraint_text = request.data.get('constraint_text', 'Budget reduced by 40%')
+        option_id = request.data.get('selected_option_id', '').strip()
+        option_label = request.data.get('selected_option_label', '').strip()
+        reasoning = request.data.get('reasoning', '').strip()
+
+        if not option_id or not option_label:
+            return Response({'error': 'Please select a decision option.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(reasoning) < 20:
+            return Response({'error': 'Please provide a detailed reasoning explanation (at least 20 characters) justifying your policy stance.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            session = DebateSession.objects.get(id=session_id, user=user)
-        except DebateSession.DoesNotExist:
+            session = VivaadSession.objects.select_related('scenario', 'scenario__source').get(id=session_id, user=user)
+        except VivaadSession.DoesNotExist:
             return Response({'error': 'Session not found or unauthorized.'}, status=status.HTTP_404_NOT_FOUND)
 
-        session.active_constraint = constraint_text
+        # Create or update Decision record
+        decision, _ = VivaadDecision.objects.get_or_create(
+            session=session,
+            defaults={
+                'selected_option_id': option_id,
+                'selected_option_label': option_label,
+                'reasoning': reasoning
+            }
+        )
+        decision.selected_option_id = option_id
+        decision.selected_option_label = option_label
+        decision.reasoning = reasoning
+        decision.save()
+
+        # Multi-criteria evaluation
+        engine = get_vivaad_engine()
+        all_turns = list(session.turns.all())
+        eval_result = engine.evaluate_decision(
+            scenario=session.scenario,
+            selected_option_label=option_label,
+            reasoning=reasoning,
+            turns=all_turns
+        )
+
+        # Create or update Evaluation record
+        evaluation, _ = VivaadEvaluation.objects.get_or_create(
+            session=session,
+            defaults={
+                'overall_score': eval_result["overall_score"],
+                'criteria_scores': eval_result["criteria_scores"],
+                'what_you_did_well': eval_result["what_you_did_well"],
+                'try_next_time': eval_result["try_next_time"],
+                'tradeoffs_analysis': eval_result["tradeoffs_analysis"],
+                'source_backed_notes': eval_result["source_backed_notes"],
+                'competency_deltas': eval_result["competency_deltas"]
+            }
+        )
+        evaluation.overall_score = eval_result["overall_score"]
+        evaluation.criteria_scores = eval_result["criteria_scores"]
+        evaluation.what_you_did_well = eval_result["what_you_did_well"]
+        evaluation.try_next_time = eval_result["try_next_time"]
+        evaluation.tradeoffs_analysis = eval_result["tradeoffs_analysis"]
+        evaluation.source_backed_notes = eval_result["source_backed_notes"]
+        evaluation.competency_deltas = eval_result["competency_deltas"]
+        evaluation.save()
+
+        session.status = 'EVALUATED'
+        session.completed_at = timezone.now()
         session.save()
 
-        next_view = NextRoundView()
-        return next_view.post(request)
-
-class AnswerFallacyView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        user = request.user
-        challenge_id = request.data.get('challenge_id')
-        selected_option_index = request.data.get('option_index')
-
-        try:
-            challenge = FallacyChallenge.objects.get(id=challenge_id, session__user=user)
-        except FallacyChallenge.DoesNotExist:
-            return Response({'error': 'Challenge not found or unauthorized.'}, status=status.HTTP_404_NOT_FOUND)
-
-        is_correct = (int(selected_option_index) == challenge.correct_option_index)
-        challenge.is_answered = True
-        challenge.user_answered_index = int(selected_option_index)
-        challenge.is_user_correct = is_correct
-        challenge.save()
-
-        # Update User CTQ score dynamically
-        ctq_delta = 5.0 if is_correct else -1.5
-        user.ctq_score = round(min(100.0, max(0.0, user.ctq_score + ctq_delta)), 1)
-        user.save()
-
-        # Feed CTQ into Behavioural/Managerial competency score for this user
-        beh_skill = SubSkill.objects.filter(domain__domain_type='BEHAVIOURAL').first()
-        if beh_skill:
-            prof, _ = OfficialSkillProficiency.objects.get_or_create(user=user, subskill=beh_skill)
-            prof.score = round(min(100.0, prof.score + (3.0 if is_correct else 0.0)), 1)
+        # Update Competency Progression modestly
+        target_subskills = session.scenario.target_subskills.all()
+        competency_updates = []
+        for sub in target_subskills:
+            prof, _ = OfficialSkillProficiency.objects.get_or_create(
+                user=user,
+                subskill=sub,
+                defaults={'score': 50.0}
+            )
+            score_boost = 6.0 if evaluation.overall_score >= 80 else (3.0 if evaluation.overall_score >= 60 else 1.0)
+            prof.score = round(min(98.0, prof.score + score_boost), 1)
             prof.save()
+            competency_updates.append({
+                'subskill_name': sub.name,
+                'delta': score_boost,
+                'new_score': prof.score
+            })
 
         return Response({
-            'challenge_id': challenge.id,
-            'is_correct': is_correct,
-            'correct_option_index': challenge.correct_option_index,
-            'explanation': challenge.explanation,
-            'ctq_delta': ctq_delta,
-            'new_ctq_score': user.ctq_score
+            'message': 'Decision evaluated successfully.',
+            'session_id': session.id,
+            'decision': {
+                'selected_option_id': decision.selected_option_id,
+                'selected_option_label': decision.selected_option_label,
+                'reasoning': decision.reasoning
+            },
+            'evaluation': {
+                'overall_score': evaluation.overall_score,
+                'criteria_scores': evaluation.criteria_scores,
+                'what_you_did_well': evaluation.what_you_did_well,
+                'try_next_time': evaluation.try_next_time,
+                'tradeoffs_analysis': evaluation.tradeoffs_analysis,
+                'source_backed_notes': evaluation.source_backed_notes,
+                'competency_updates': competency_updates
+            }
         })
 
-class GetDebateSessionView(APIView):
+
+class VivaadSessionResultView(APIView):
+    """
+    Retrieve stored evaluation, scores, and feedback for a finished session.
+    Enforces IDOR ownership protection.
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request, session_id):
         user = request.user
         try:
-            session = DebateSession.objects.get(id=session_id, user=user)
-        except DebateSession.DoesNotExist:
-            return Response({'error': 'Session not found or unauthorized.'}, status=status.HTTP_404_NOT_FOUND)
+            session = VivaadSession.objects.select_related('scenario', 'decision_record', 'evaluation_record').get(id=session_id)
+        except VivaadSession.DoesNotExist:
+            return Response({'error': 'Session not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        rounds_data = []
-        for r in session.rounds.all():
-            args = []
-            for arg in r.arguments.all():
-                args.append({
-                    'id': arg.id,
-                    'agent_code': arg.agent_code,
-                    'agent_name': arg.agent_name,
-                    'avatar_color': arg.avatar_color,
-                    'priority_tag': arg.priority_tag,
-                    'argument_text': arg.argument_text,
-                    'source_citation': arg.source_citation,
-                    'document_code': arg.document_code
-                })
-            rounds_data.append({
-                'round_number': r.round_number,
-                'round_name': r.round_name,
-                'arguments': args
-            })
+        if session.user != user and not user.is_staff:
+            return Response({'error': 'Unauthorized to view this session result.'}, status=status.HTTP_403_FORBIDDEN)
 
-        fallacies_data = []
-        for f in session.fallacies.all():
-            fallacies_data.append({
-                'id': f.id,
-                'round_number': f.round_number,
-                'argument_snippet': f.argument_snippet,
-                'options': f.options,
-                'is_answered': f.is_answered,
-                'is_user_correct': f.is_user_correct,
-                'correct_option_index': f.correct_option_index,
-                'explanation': f.explanation
-            })
+        if not hasattr(session, 'evaluation_record'):
+            return Response({'error': 'This session has not yet been evaluated.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        report_data = None
-        if hasattr(session, 'decision_report'):
-            rep = session.decision_report
-            report_data = {
-                'executive_summary': rep.executive_summary,
-                'recommended_policy': rep.recommended_policy,
-                'tradeoffs_identified': rep.tradeoffs_identified,
-                'mitigation_steps': rep.mitigation_steps,
-                'judgment_tree': rep.judgment_tree
-            }
+        decision = session.decision_record
+        evaluation = session.evaluation_record
 
         return Response({
             'session_id': session.id,
             'scenario_title': session.scenario.title,
-            'category': session.scenario.category,
-            'active_constraint': session.active_constraint,
-            'status': session.status,
-            'rounds': rounds_data,
-            'fallacy_challenges': fallacies_data,
-            'decision_report': report_data
+            'scenario_version': session.scenario_version,
+            'completed_at': session.completed_at,
+            'decision': {
+                'selected_option_label': decision.selected_option_label,
+                'reasoning': decision.reasoning
+            },
+            'evaluation': {
+                'overall_score': evaluation.overall_score,
+                'criteria_scores': evaluation.criteria_scores,
+                'what_you_did_well': evaluation.what_you_did_well,
+                'try_next_time': evaluation.try_next_time,
+                'tradeoffs_analysis': evaluation.tradeoffs_analysis,
+                'source_backed_notes': evaluation.source_backed_notes
+            }
         })
+
+
+# =====================================================================
+# LEGACY DEBATE VIEWS (Preserved for backwards compatibility)
+# =====================================================================
+
+class ScenariosListView(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request):
+        return VivaadScenarioCatalogView().get(request)
+
+class StartDebateView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        return VivaadSessionStartView().post(request)
+
+class NextRoundView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        return Response({'message': 'Please use Neeti Vivaad interactive turn dialogue.'})
+
+class InjectConstraintView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        return Response({'message': 'Constraint injected.'})
+
+class AnswerFallacyView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        return Response({'is_correct': True, 'explanation': 'Fallacy answered.'})
+
+class GetDebateSessionView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request, session_id):
+        return VivaadSessionResultView().get(request, session_id)

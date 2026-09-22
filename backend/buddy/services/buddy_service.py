@@ -219,8 +219,12 @@ Respond directly as Neeti Saarthi Buddy. Keep it under 3-4 sentences.
             return "Quick Knowledge Checks test what you remember after each lesson. They take just a few minutes, provide instant explanations, and update your skill progress."
 
         # 9. Neeti Vivaad / Policy Decisions
-        if any(w in msg for w in ['vivaad', 'debate', 'decision', 'scenario', 'perspective']):
-            return "Neeti Vivaad lets you practice real-world policy decisions. You'll hear four different perspectives—from field enumerators to privacy officers—spot logical fallacies, and submit your recommendation."
+        if any(w in msg for w in ['vivaad', 'debate', 'decision', 'scenario', 'perspective', 'policy']):
+            recent_v = context.get('recent_debates', [])
+            if recent_v and any(v.get('score') is not None for v in recent_v):
+                last_v = next(v for v in recent_v if v.get('score') is not None)
+                return f"In your recent Neeti Vivaad simulation '{last_v['scenario_title']}', you scored {last_v['score']}% on policy reasoning and multi-criteria evaluation. Practicing more scenarios helps hone your evidence-backed decision making."
+            return "Neeti Vivaad lets you practice real-world policy decisions. You'll examine authentic situations, hear multiple stakeholder perspectives, consider source evidence, submit your reasoned decision, and receive structured multi-criteria feedback."
 
         # 10. Default welcoming guidance
         return f"Hi {user['full_name']}! I'm here to help you get the most out of Neeti Saarthi. You can ask me about recommended courses, your skills, Knowledge Checks, or how to practice policy decisions in Neeti Vivaad."

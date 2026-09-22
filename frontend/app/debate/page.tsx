@@ -3,247 +3,299 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
-  MessageSquare, Play, Sparkles, Scale, Shield, AlertTriangle, 
-  ChevronRight, ChevronDown, CheckCircle2, Award, Zap, HelpCircle, Layers, LogIn, RefreshCcw, FileText, Eye
+  Scale, MessageSquare, Sparkles, Shield, AlertTriangle, 
+  ChevronRight, CheckCircle2, Award, Zap, HelpCircle, Layers, 
+  LogIn, RefreshCw, FileText, Eye, Users, Send, ArrowRight, BookOpen, Check, Play
 } from 'lucide-react';
 import { authFetch, getAccessToken, getApiBaseUrl } from '../utils/api';
 import { AuthModal } from '../components/AuthModal';
 
-export default function DebateStudio() {
+interface Perspective {
+  id: number;
+  name: string;
+  role: string;
+  avatar_color: string;
+  primary_concern: string;
+  objective?: string;
+  position: string;
+  relevant_evidence?: string;
+  source_page?: number | null;
+  key_questions?: string[];
+}
+
+interface DecisionOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
+interface ScenarioDetail {
+  id: number;
+  title: string;
+  version: number;
+  category: string;
+  difficulty: string;
+  source_type: string;
+  source_label: string;
+  situation: string;
+  decision_question: string;
+  objective: string;
+  constraints: string[];
+  affected_people: string[];
+  risks: string[];
+  options: DecisionOption[];
+  perspectives: Perspective[];
+}
+
+interface SimulationSession {
+  session_id: number;
+  scenario_id: number;
+  scenario_title: string;
+  version: number;
+  status: string;
+}
+
+interface DialogueTurn {
+  speaker: 'LEARNER' | 'PERSPECTIVE';
+  message: string;
+  turn_number: number;
+}
+
+export default function NeetiVivaadPage() {
   const [scenarios, setScenarios] = useState<any[]>([]);
   const [selectedScenarioId, setSelectedScenarioId] = useState<number | null>(null);
-  const [session, setSession] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [whatIfInput, setWhatIfInput] = useState('');
-  const [showWhatIfModal, setShowWhatIfModal] = useState(false);
-  const [showJudgmentTree, setShowJudgmentTree] = useState(false);
-  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({'node-1': true});
-  const [fallacyAnswered, setFallacyAnswered] = useState<boolean>(false);
-  const [fallacyResult, setFallacyResult] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [scenarioDetail, setScenarioDetail] = useState<ScenarioDetail | null>(null);
+  
+  // Simulation Flow States
+  const [step, setStep] = useState<'catalog' | 'perspectives' | 'discussion' | 'decision' | 'evaluation'>('catalog');
+  const [session, setSession] = useState<SimulationSession | null>(null);
+  
+  // Discussion Turn States
+  const [activePerspective, setActivePerspective] = useState<Perspective | null>(null);
+  const [dialogueTurns, setDialogueTurns] = useState<DialogueTurn[]>([]);
+  const [learnerInput, setLearnerInput] = useState('');
+  const [sendingTurn, setSendingTurn] = useState(false);
+  const [turnCount, setTurnCount] = useState(0);
+  const [isFinalTurn, setIsFinalTurn] = useState(false);
 
-  // Auth & Preview States
+  // Decision & Reasoning States
+  const [selectedOption, setSelectedOption] = useState<DecisionOption | null>(null);
+  const [reasoning, setReasoning] = useState('');
+  const [evaluating, setEvaluating] = useState(false);
+  const [evaluationResult, setEvaluationResult] = useState<any>(null);
+
+  // UI & Auth States
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isAuth, setIsAuth] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalTitle, setAuthModalTitle] = useState('Sign in to practise this scenario');
-  const [authModalMessage, setAuthModalMessage] = useState('Sign in to practise this scenario, explore trade-offs, and improve your decision-making skills.');
-
-  const stakeholderPreviews = [
-    {
-      role: "Senior Statistical Officer (SSO)",
-      badge: "Statistical Methodology",
-      badgeColor: "bg-blue-100 text-blue-900 border-blue-800",
-      perspective: "Data integrity and sampling margins cannot be compromised under field pressure. Automated anomaly detection and 95% confidence intervals are legally binding.",
-      source: "MoSPI IDQF 2024 Guidelines, Section 1"
-    },
-    {
-      role: "Data Protection Officer (DPO)",
-      badge: "Privacy & Compliance",
-      badgeColor: "bg-emerald-100 text-emerald-900 border-emerald-800",
-      perspective: "Citizen biometric tokens and Aadhaar data must remain masked under k-anonymity (k>=5). Administrative expediency cannot override statutory privacy protections.",
-      source: "Digital Personal Data Protection (DPDP) Act 2023"
-    },
-    {
-      role: "Field Enumerator (FE)",
-      badge: "Ground Operations",
-      badgeColor: "bg-amber-100 text-amber-900 border-amber-800",
-      perspective: "Rural terrain and weak server connectivity cause real public distress. Field teams urgently need verified offline-first fallback modes to maintain public trust.",
-      source: "District Survey Administration SOP & Field Guidelines"
-    },
-    {
-      role: "Public Advocate (PA)",
-      badge: "Accountability & Rights",
-      badgeColor: "bg-purple-100 text-purple-900 border-purple-800",
-      perspective: "No eligible citizen should be denied rightful benefits due to technical or biometric failure. Grievance redressal must be immediate, human-accessible, and transparent.",
-      source: "Citizen Charter & Public Service Guarantee Act"
-    }
-  ];
+  const [authModalMessage, setAuthModalMessage] = useState('Sign in to explore stakeholder perspectives, engage in dialogue, and make an evidence-backed decision.');
 
   useEffect(() => {
     setIsAuth(!!getAccessToken());
-    const base = getApiBaseUrl();
-    fetch(`${base}/api/debate/scenarios/`)
-      .then(res => res.json())
-      .then(d => {
-        setScenarios(d.scenarios || []);
-        if (d.scenarios?.length > 0) {
-          setSelectedScenarioId(d.scenarios[0].id);
-        }
-      })
-      .catch(() => {
-        setScenarios([]);
-      });
+    fetchScenarios();
   }, []);
 
-  const handleStartDebate = async () => {
+  const fetchScenarios = async () => {
+    const base = getApiBaseUrl();
+    try {
+      const res = await fetch(`${base}/api/debate/scenarios/`);
+      const d = await res.json();
+      setScenarios(d.scenarios || []);
+      if (d.scenarios?.length > 0) {
+        loadScenarioDetails(d.scenarios[0].id);
+      }
+    } catch {
+      setScenarios([]);
+    }
+  };
+
+  const loadScenarioDetails = async (scenarioId: number) => {
+    setSelectedScenarioId(scenarioId);
+    setLoading(true);
+    const base = getApiBaseUrl();
+    try {
+      const res = await fetch(`${base}/api/debate/scenarios/${scenarioId}/`);
+      if (res.ok) {
+        const d = await res.json();
+        setScenarioDetail(d);
+        if (d.perspectives && d.perspectives.length > 0) {
+          setActivePerspective(d.perspectives[0]);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Start authenticated simulation session
+  const handleStartSimulation = async () => {
     const token = getAccessToken();
     if (!token) {
-      setAuthModalTitle("Sign in to practise this scenario");
-      setAuthModalMessage("Sign in to practise this scenario, explore trade-offs, and improve your decision-making skills.");
+      setAuthModalTitle("Sign in to Practise Policy Decision");
+      setAuthModalMessage("Sign in to engage in structured dialogue with stakeholders and submit your reasoned policy decision.");
       setAuthModalOpen(true);
       return;
     }
 
+    if (!selectedScenarioId) return;
+
     setLoading(true);
-    setFallacyAnswered(false);
-    setFallacyResult(null);
     setError(null);
+
     try {
-      const res = await authFetch('/api/debate/start/', {
+      const res = await authFetch('/api/debate/sessions/start/', {
         method: 'POST',
         body: JSON.stringify({ scenario_id: selectedScenarioId })
       });
       const d = await res.json();
-      if (!res.ok) throw new Error(d.error || 'Failed to start debate session.');
+      if (!res.ok) throw new Error(d.error || 'Failed to start simulation.');
+
       setSession(d);
-      setLoading(false);
+      setStep('perspectives');
+      setDialogueTurns([]);
+      setTurnCount(0);
+      setIsFinalTurn(false);
+      setSelectedOption(null);
+      setReasoning('');
+      setEvaluationResult(null);
     } catch (e: any) {
+      setError(e.message || 'Error starting simulation.');
+    } finally {
       setLoading(false);
-      setError(e.message || "Could not connect to backend server.");
     }
   };
 
-  const handleNextRound = async () => {
-    if (!session) return;
-    setLoading(true);
-    setFallacyAnswered(false);
-    setFallacyResult(null);
+  // Advance to Discussion step
+  const handleEnterDiscussion = (persp?: Perspective) => {
+    if (persp) setActivePerspective(persp);
+    setStep('discussion');
+  };
+
+  // Send turn in interactive discussion
+  const handleSendTurn = async () => {
+    if (!session || !activePerspective || !learnerInput.trim() || sendingTurn) return;
+
+    const userMsg = learnerInput.trim();
+    setLearnerInput('');
+    setSendingTurn(true);
     setError(null);
+
+    // Optimistically add user turn
+    const currentTurnNum = turnCount + 1;
+    setDialogueTurns(prev => [...prev, { speaker: 'LEARNER', message: userMsg, turn_number: currentTurnNum }]);
+
     try {
-      const res = await authFetch('/api/debate/next-round/', {
+      const res = await authFetch(`/api/debate/sessions/${session.session_id}/turn/`, {
         method: 'POST',
-        body: JSON.stringify({ session_id: session.session_id })
+        body: JSON.stringify({
+          perspective_id: activePerspective.id,
+          message: userMsg
+        })
       });
       const d = await res.json();
-      if (!res.ok) throw new Error(d.error || 'Failed to advance round.');
-      setSession((prev: any) => ({
+      if (!res.ok) throw new Error(d.error || 'Failed to get perspective response.');
+
+      setDialogueTurns(prev => [
         ...prev,
-        current_round: d.current_round,
-        round_name: d.round_name,
-        arguments: d.arguments,
-        fallacy_challenge: d.fallacy_challenge,
-        decision_report: d.decision_report || prev.decision_report
-      }));
-      if (d.decision_report && typeof window !== 'undefined') {
+        { speaker: 'PERSPECTIVE', message: d.reply, turn_number: currentTurnNum }
+      ]);
+      setTurnCount(d.learner_turn_number);
+      if (d.is_final_turn) {
+        setIsFinalTurn(true);
+      }
+    } catch (e: any) {
+      setError(e.message || 'Error in discussion turn.');
+    } finally {
+      setSendingTurn(false);
+    }
+  };
+
+  // Submit Final Decision & Reasoning
+  const handleSubmitDecision = async () => {
+    if (!session || !selectedOption) return;
+    if (reasoning.trim().length < 20) {
+      setError('Please provide at least 20 characters explaining your policy rationale and trade-offs.');
+      return;
+    }
+
+    setEvaluating(true);
+    setError(null);
+
+    try {
+      const res = await authFetch(`/api/debate/sessions/${session.session_id}/decide/`, {
+        method: 'POST',
+        body: JSON.stringify({
+          selected_option_id: selectedOption.id,
+          selected_option_label: selectedOption.label,
+          reasoning: reasoning.trim()
+        })
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Failed to evaluate decision.');
+
+      setEvaluationResult(d.evaluation);
+      setStep('evaluation');
+
+      // Dispatch event to Buddy if available
+      if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('buddy-guidance', {
           detail: {
-            type: 'debate_completed',
-            message: "Good thinking. You've completed the scenario. Let's look at your decision and what you considered."
+            type: 'vivaad_evaluated',
+            message: `You completed your policy decision simulation with an overall score of ${d.evaluation.overall_score}%.`
           }
         }));
       }
-      setLoading(false);
     } catch (e: any) {
-      setLoading(false);
-      setError(e.message || 'Error advancing round.');
+      setError(e.message || 'Error submitting decision.');
+    } finally {
+      setEvaluating(false);
     }
-  };
-
-  const handleInjectConstraint = async () => {
-    if (!session || !whatIfInput.trim()) return;
-    setLoading(true);
-    setShowWhatIfModal(false);
-    setError(null);
-    try {
-      const res = await authFetch('/api/debate/inject-constraint/', {
-        method: 'POST',
-        body: JSON.stringify({
-          session_id: session.session_id,
-          constraint_text: whatIfInput
-        })
-      });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error || 'Failed to inject constraint.');
-      setSession((prev: any) => ({
-        ...prev,
-        active_constraint: whatIfInput,
-        current_round: d.current_round,
-        round_name: d.round_name,
-        arguments: d.arguments,
-        fallacy_challenge: d.fallacy_challenge,
-        decision_report: d.decision_report || prev.decision_report
-      }));
-      setWhatIfInput('');
-      setLoading(false);
-    } catch (e: any) {
-      setLoading(false);
-      setError(e.message || 'Error injecting constraint.');
-    }
-  };
-
-  const handleAnswerFallacy = async (optionIdx: number) => {
-    if (!session?.fallacy_challenge || fallacyAnswered) return;
-    try {
-      const res = await authFetch('/api/debate/answer-fallacy/', {
-        method: 'POST',
-        body: JSON.stringify({
-          challenge_id: session.fallacy_challenge.id,
-          option_index: optionIdx
-        })
-      });
-      const d = await res.json();
-      setFallacyAnswered(true);
-      setFallacyResult(d);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const toggleNode = (nodeId: string) => {
-    setExpandedNodes(prev => ({ ...prev, [nodeId]: !prev[nodeId] }));
   };
 
   return (
     <div className="min-h-screen bg-[#F8F7F2] text-[#111111] py-8 sm:py-12 px-4 sm:px-8 max-w-[1360px] mx-auto space-y-8 font-sans">
       
-      {/* Header Banner */}
+      {/* Top Banner */}
       <div className="card-brutal-navy !bg-[#0B1F3A] !text-white p-6 sm:p-10 shadow-brutal-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
         <div className="max-w-2xl space-y-3 relative z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#061120] border-2 border-[#111111] text-[#FCD34D] text-xs font-mono shadow-brutal-sm">
-            <Sparkles className="w-3.5 h-3.5 text-[#F2A900]" />
+            <Scale className="w-3.5 h-3.5 text-[#F2A900]" />
             <span className="font-bold uppercase tracking-wider">
-              {isAuth ? 'PRACTICAL DECISION EXERCISE &bull; 4 VIEWPOINTS' : '★ PREVIEW MODE &bull; 4 VIEWPOINTS'}
+              {isAuth ? 'POLICY DECISION SIMULATION' : '★ PUBLIC SHOWCASE &bull; EXPLORE REAL POLICY SCENARIOS'}
             </span>
           </div>
           <h1 className="display-section text-white">
             NEETI VIVAAD
           </h1>
           <p className="text-xs sm:text-sm text-zinc-200 font-mono font-medium">
-            Explore complex government decisions with 4 different perspectives based on trusted sources.
+            Enter real public-sector situations, examine conflicting perspectives, consider evidence, make a reasoned decision, and receive structured multi-criteria feedback.
           </p>
 
           {!isAuth && (
             <div className="pt-2">
               <span className="inline-block px-3 py-1.5 rounded-xl bg-white border-2 border-[#111111] text-xs font-mono font-bold text-[#111111] shadow-brutal-sm">
-                ★ PREVIEW MODE — Sign in to start the interactive decision exercise and test policy scenarios.
+                ★ PREVIEW MODE — Anyone can explore scenarios & stakeholder viewpoints. Sign in to engage in dialogue and evaluate your decision.
               </span>
             </div>
           )}
         </div>
 
-        {session && (
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => setShowWhatIfModal(true)}
-              className="btn-brutal-saffron !text-xs !py-2.5 !px-4 flex items-center gap-2"
-            >
-              <Zap className="w-4 h-4" />
-              <span>Add a Scenario Twist</span>
-            </button>
-
-            {session.decision_report && (
-              <button
-                onClick={() => setShowJudgmentTree(!showJudgmentTree)}
-                className="btn-brutal-emerald !text-xs !py-2.5 !px-4 flex items-center gap-2"
-              >
-                <Layers className="w-4 h-4" />
-                <span>{showJudgmentTree ? 'Hide Summary' : 'Decision Summary'}</span>
-              </button>
-            )}
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/debate/studio"
+            className="btn-brutal-saffron !text-xs !py-2.5 !px-4 flex items-center gap-2"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Scenario Studio</span>
+          </Link>
+        </div>
       </div>
 
+      {/* Error Message */}
       {error && (
         <div className="card-brutal bg-rose-100 border-2 border-[#111111] text-rose-950 p-4 text-xs font-mono flex items-center justify-between shadow-brutal-sm">
           <span>{error}</span>
@@ -262,289 +314,605 @@ export default function DebateStudio() {
         </div>
       )}
 
-      {!session ? (
-        /* Scenario Selection Screen */
-        <div className="card-brutal bg-white p-6 sm:p-8 space-y-6">
-          <div className="space-y-1">
-            <span className="badge-starburst badge-starburst-saffron text-xs">
-              ★ SELECT A POLICY SCENARIO
-            </span>
-            <h2 className="font-display font-extrabold uppercase text-xl text-[#111111] mt-1">
-              Choose a Real-World Situation to Explore
-            </h2>
-            <p className="text-xs text-[#4B5563]">
-              Select a scenario to see how different government stakeholders approach this problem.
-            </p>
+      {/* MAIN CONTENT AREA */}
+      {step === 'catalog' && (
+        /* STEP 1: SCENARIO CATALOG & SELECTION */
+        <div className="space-y-6">
+          <div className="card-brutal bg-white p-6 sm:p-8 space-y-6">
+            <div className="space-y-1">
+              <span className="badge-starburst badge-starburst-saffron text-xs">
+                ★ AVAILABLE POLICY SCENARIOS
+              </span>
+              <h2 className="font-display font-extrabold uppercase text-xl text-[#111111] mt-1">
+                Select a Policy Situation to Explore
+              </h2>
+              <p className="text-xs text-[#4B5563]">
+                Each scenario tests balancing administrative velocity, statutory privacy, and public accountability.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {scenarios.map((sc: any) => {
+                const isSelected = selectedScenarioId === sc.id;
+                return (
+                  <div
+                    key={sc.id}
+                    onClick={() => loadScenarioDetails(sc.id)}
+                    className={`p-5 rounded-2xl border-2 border-[#111111] cursor-pointer transition-all flex flex-col justify-between ${
+                      isSelected 
+                        ? 'bg-[#F2A900] text-[#111111] shadow-brutal-sm' 
+                        : 'bg-[#F8F7F2] text-[#111111] hover:bg-zinc-50'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white/70 border border-[#111111]">
+                          {sc.category || 'Policy'}
+                        </span>
+                        <span className="text-[10px] font-mono font-bold">
+                          {sc.source_label || 'Case Study'}
+                        </span>
+                      </div>
+                      <h3 className="font-display font-extrabold uppercase text-sm mb-2 line-clamp-2">
+                        {sc.title}
+                      </h3>
+                      <p className="text-xs leading-relaxed opacity-90 line-clamp-3 mb-4">
+                        {sc.situation_summary}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-[#111111]/20 flex items-center justify-between text-[11px] font-mono font-bold">
+                      <span>{sc.perspective_count || 4} Stakeholders</span>
+                      <span className="flex items-center gap-1">Select <ChevronRight className="w-3.5 h-3.5" /></span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {scenarios.map((sc: any) => {
-              const isSelected = selectedScenarioId === sc.id;
-              return (
-                <div
-                  key={sc.id}
-                  onClick={() => setSelectedScenarioId(sc.id)}
-                  className={`p-5 rounded-2xl border-2 border-[#111111] cursor-pointer transition-all ${
-                    isSelected 
-                      ? 'bg-[#F2A900] text-[#111111] shadow-brutal-sm' 
-                      : 'bg-[#F8F7F2] text-[#111111] hover:bg-zinc-50'
+          {/* Scenario Overview Details Card */}
+          {scenarioDetail && (
+            <div className="card-brutal bg-white p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-[#111111]">
+                <div>
+                  <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-emerald-100 text-emerald-950 border border-[#111111]">
+                    {scenarioDetail.category} &bull; {scenarioDetail.difficulty} (v{scenarioDetail.version})
+                  </span>
+                  <h2 className="font-display font-black uppercase text-xl text-[#111111] mt-2">
+                    {scenarioDetail.title}
+                  </h2>
+                </div>
+                <button
+                  onClick={handleStartSimulation}
+                  disabled={loading}
+                  className="btn-brutal-emerald !text-sm !py-3 !px-6 flex items-center gap-2 self-start sm:self-auto shrink-0"
+                >
+                  <Play className="w-4 h-4" />
+                  <span>Start Policy Simulation</span>
+                </button>
+              </div>
+
+              {/* Dilemma Question Callout */}
+              <div className="p-4 rounded-xl bg-amber-50 border-2 border-[#111111] shadow-brutal-sm">
+                <span className="text-[10px] font-mono font-bold uppercase text-amber-900 block mb-1">
+                  Core Policy Decision Dilemma
+                </span>
+                <p className="text-sm font-bold text-slate-900">
+                  {scenarioDetail.decision_question}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Situation Description */}
+                <div className="lg:col-span-2 space-y-3">
+                  <h4 className="font-display font-extrabold uppercase text-xs text-slate-700">
+                    Administrative Situation & Context
+                  </h4>
+                  <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line font-sans">
+                    {scenarioDetail.situation}
+                  </p>
+
+                  <div className="pt-2">
+                    <h5 className="font-display font-bold uppercase text-[11px] text-slate-500 mb-2">
+                      Key Operational Constraints
+                    </h5>
+                    <ul className="space-y-1.5">
+                      {scenarioDetail.constraints?.map((c, i) => (
+                        <li key={i} className="text-xs text-slate-700 flex items-start gap-2">
+                          <span className="text-emerald-700 font-bold">•</span>
+                          <span>{c}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Affected Stakeholders Preview */}
+                <div className="space-y-3 bg-[#F8F7F2] p-4 rounded-xl border-2 border-[#111111]">
+                  <h4 className="font-display font-extrabold uppercase text-xs text-slate-700">
+                    Civil Service Perspectives ({scenarioDetail.perspectives?.length || 0})
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    You will hear and deliberate with these viewpoints during the simulation:
+                  </p>
+                  <div className="space-y-2">
+                    {scenarioDetail.perspectives?.map((p) => (
+                      <div key={p.id} className="p-2.5 bg-white border border-[#111111] rounded-lg text-xs">
+                        <div className="font-bold text-slate-900">{p.name}</div>
+                        <div className="text-[10px] font-mono text-emerald-800 font-bold">{p.role}</div>
+                        <div className="text-[11px] text-slate-600 mt-1 line-clamp-1 italic">"{p.primary_concern}"</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* STEP 2: STAKEHOLDER PERSPECTIVES BREAKDOWN */}
+      {step === 'perspectives' && scenarioDetail && (
+        <div className="space-y-6">
+          <div className="card-brutal bg-white p-6 sm:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="badge-starburst badge-starburst-saffron text-xs">
+                  ★ STEP 1: HEAR STAKEHOLDER PERSPECTIVES
+                </span>
+                <h2 className="font-display font-extrabold uppercase text-xl text-[#111111] mt-1">
+                  Examine Competing Priorities & Arguments
+                </h2>
+                <p className="text-xs text-[#4B5563]">
+                  Review the arguments and source evidence from each stakeholder before entering interactive discussion.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setStep('catalog')}
+                  className="px-3 py-2 border-2 border-[#111111] rounded-xl text-xs font-mono font-bold hover:bg-slate-100"
+                >
+                  Change Scenario
+                </button>
+                <button
+                  onClick={() => handleEnterDiscussion()}
+                  className="btn-brutal-primary !text-xs !py-2.5 !px-5 flex items-center gap-2"
+                >
+                  <span>Start Discussion (2-4 Turns)</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Perspectives Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {scenarioDetail.perspectives?.map((p) => (
+                <div key={p.id} className="p-5 rounded-2xl border-2 border-[#111111] bg-[#F8F7F2] flex flex-col justify-between shadow-brutal-sm">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white border border-[#111111]">
+                        {p.role}
+                      </span>
+                      {p.source_page && (
+                        <span className="text-[10px] font-mono font-bold text-emerald-800">
+                          Source Page {p.source_page}
+                        </span>
+                      )}
+                    </div>
+
+                    <h3 className="font-display font-extrabold uppercase text-base text-slate-900 mb-1">
+                      {p.name}
+                    </h3>
+                    <div className="text-xs font-bold text-emerald-900 mb-3">
+                      Priority: {p.primary_concern}
+                    </div>
+
+                    <p className="text-xs text-slate-800 italic bg-white p-3 rounded-xl border border-[#111111] mb-3 leading-relaxed">
+                      "{p.position}"
+                    </p>
+
+                    {p.relevant_evidence && (
+                      <div className="text-[11px] text-slate-600 bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-300 mb-3">
+                        <span className="font-bold text-emerald-950">Statutory / Document Evidence: </span>
+                        {p.relevant_evidence}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-3 border-t border-[#111111]/20 flex items-center justify-between">
+                    <span className="text-[11px] text-slate-500">
+                      {p.key_questions?.length || 0} Challenge Questions
+                    </span>
+                    <button
+                      onClick={() => handleEnterDiscussion(p)}
+                      className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-[#111111] rounded-lg text-xs font-bold transition flex items-center gap-1"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 text-emerald-700" />
+                      Debate This Role
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3: CONTROLLED INTERACTIVE DISCUSSION (2-4 TURNS) */}
+      {step === 'discussion' && activePerspective && scenarioDetail && (
+        <div className="space-y-6">
+          <div className="card-brutal bg-white p-6 sm:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-[#111111]">
+              <div>
+                <span className="badge-starburst badge-starburst-saffron text-xs">
+                  ★ STEP 2: CONTROLLED POLICY DIALOGUE
+                </span>
+                <h2 className="font-display font-extrabold uppercase text-xl text-[#111111] mt-1">
+                  Discussing with {activePerspective.name} ({activePerspective.role})
+                </h2>
+                <p className="text-xs text-[#4B5563]">
+                  Turn {turnCount} of 3. Address their concerns and test your arguments before making your decision.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setStep('decision')}
+                  className="btn-brutal-emerald !text-xs !py-2.5 !px-4 flex items-center gap-1.5"
+                >
+                  <span>Proceed to Decision</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Stakeholder Switcher */}
+            <div className="flex flex-wrap gap-2">
+              <span className="text-xs font-mono font-bold text-slate-500 py-1 mr-1">Switch Perspective:</span>
+              {scenarioDetail.perspectives?.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setActivePerspective(p)}
+                  className={`text-xs px-3 py-1 rounded-lg border font-mono font-bold transition ${
+                    activePerspective.id === p.id 
+                      ? 'bg-[#0B1F3A] text-white border-[#111111]' 
+                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                   }`}
                 >
-                  <span className="text-[10px] font-mono font-bold uppercase block mb-1">
-                    Scenario #{sc.id} &bull; {sc.category || 'Policy Situation'}
-                  </span>
-                  <h3 className="font-display font-extrabold uppercase text-base mb-2">
-                    {sc.title}
-                  </h3>
-                  <p className="text-xs leading-relaxed opacity-90">
-                    {sc.description}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* 4 Stakeholder Perspectives Preview (Shown for visitors in Preview Mode) */}
-          {!isAuth && (
-            <div className="space-y-4 pt-4 border-t-2 border-[#111111]">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <span className="badge-starburst badge-starburst-navy text-[11px]">
-                    ★ 4 STAKEHOLDER PERSPECTIVES (PREVIEW)
-                  </span>
-                  <h3 className="font-display font-bold uppercase text-base text-[#111111] mt-1">
-                    How Different Stakeholders Approach This Problem
-                  </h3>
-                </div>
-                <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-1 rounded bg-[#0B1F3A] text-white">
-                  Preview Mode
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {stakeholderPreviews.map((st, sIdx) => (
-                  <div key={sIdx} className="p-4 rounded-xl border-2 border-[#111111] bg-[#F8F7F2] space-y-2.5 shadow-brutal-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold uppercase px-2 py-0.5 rounded bg-[#111111] text-white">
-                        {st.role}
-                      </span>
-                      <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded border ${st.badgeColor}`}>
-                        {st.badge}
-                      </span>
-                    </div>
-                    <p className="text-xs font-sans text-[#111111] leading-relaxed italic border-l-3 border-[#F2A900] pl-2.5">
-                      &ldquo;{st.perspective}&rdquo;
-                    </p>
-                    <div className="text-[10px] font-mono text-[#0F766E] font-bold">
-                      Source: {st.source}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-950 flex items-center gap-2 text-xs font-mono">
-                <Sparkles className="w-4 h-4 text-[#F2A900] shrink-0" />
-                <span className="font-bold">
-                  Sign in to interact with all 4 agents, inject real-world constraints, and generate complete decision reports.
-                </span>
-              </div>
-            </div>
-          )}
-
-          <button
-            onClick={handleStartDebate}
-            disabled={loading}
-            className="btn-brutal-primary w-full !text-sm !py-3.5 flex items-center justify-center gap-2 font-bold"
-          >
-            {loading ? (
-              <>
-                <RefreshCcw className="w-4 h-4 animate-spin" />
-                <span>Preparing Decision Perspectives...</span>
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4 fill-current" />
-                <span>{isAuth ? 'Start Decision Exercise' : 'Start Decision Exercise (Sign In to Practise)'}</span>
-              </>
-            )}
-          </button>
-        </div>
-      ) : (
-        /* Active Debate Arena Session */
-        <div className="space-y-8">
-          
-          {/* Active Round Indicator */}
-          <div className="card-brutal bg-white p-5 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="badge-starburst badge-starburst-emerald text-xs">
-                ★ ROUND {session.current_round} OF 3
-              </span>
-              <h3 className="font-display font-bold uppercase text-base text-[#111111]">
-                {session.round_name || 'Stakeholder Perspectives'}
-              </h3>
+                  {p.role}
+                </button>
+              ))}
             </div>
 
-            {session.active_constraint && (
-              <span className="badge-starburst badge-starburst-saffron text-[10px]">
-                TWIST: {session.active_constraint}
-              </span>
-            )}
-
-            <button
-              onClick={handleNextRound}
-              disabled={loading}
-              className="btn-brutal-primary !text-xs !py-2 !px-4"
-            >
-              {loading ? 'Updating...' : 'Next Round →'}
-            </button>
-          </div>
-
-          {/* 4 Agent Arguments Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {(session.arguments || []).map((arg: any, idx: number) => (
-              <div 
-                key={idx}
-                className="card-brutal bg-white p-6 space-y-4 flex flex-col justify-between"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-black uppercase px-2.5 py-1 rounded bg-[#111111] text-white">
-                      {arg.persona_role}
-                    </span>
-                    <span className="text-xs font-mono text-[#0F766E] font-bold">
-                      {arg.evidence_source ? `Source: ${arg.evidence_source}` : 'Trusted Source'}
-                    </span>
-                  </div>
-
-                  <p className="text-sm font-sans text-[#111111] leading-relaxed border-l-3 border-[#F2A900] pl-3 italic">
-                    &ldquo;{arg.argument_text}&rdquo;
-                  </p>
+            {/* Dialogue Transcript Container */}
+            <div className="space-y-4 max-h-[420px] overflow-y-auto p-4 bg-[#F8F7F2] rounded-2xl border-2 border-[#111111]">
+              {/* Initial Stakeholder Opening Statement */}
+              <div className="p-4 bg-white border-2 border-[#111111] rounded-xl shadow-brutal-sm space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono font-bold uppercase text-emerald-800">
+                    {activePerspective.name} &bull; Opening Stance
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400">Official Record</span>
                 </div>
-
-                {arg.fallacy_tag && (
-                  <div className="pt-3 border-t-2 border-[#111111] flex items-center justify-between text-xs font-mono text-amber-800">
-                    <span className="font-bold">⚠️ Reasoning Note:</span>
-                    <span>{arg.fallacy_tag}</span>
-                  </div>
+                <p className="text-xs text-slate-800 leading-relaxed">
+                  "{activePerspective.position}"
+                </p>
+                {activePerspective.key_questions && activePerspective.key_questions.length > 0 && (
+                  <p className="text-xs text-slate-600 font-medium pt-1">
+                    <strong>Challenge: </strong>{activePerspective.key_questions[0]}
+                  </p>
                 )}
               </div>
-            ))}
-          </div>
 
-          {/* Fallacy Hunter Challenge */}
-          {session.fallacy_challenge && !fallacyAnswered && (
-            <div className="card-brutal bg-[#F2A900] text-[#111111] p-6 space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="badge-starburst badge-starburst-navy text-xs">
-                  ★ REASONING CHALLENGE
-                </span>
-                <span className="text-xs font-mono font-bold uppercase">
-                  Spot the flaw in this argument
+              {/* Dynamic Turn History */}
+              {dialogueTurns.map((turn, i) => (
+                <div 
+                  key={i} 
+                  className={`p-4 rounded-xl border-2 border-[#111111] text-xs leading-relaxed ${
+                    turn.speaker === 'LEARNER' 
+                      ? 'bg-blue-50 ml-6 border-blue-900 shadow-brutal-sm' 
+                      : 'bg-white mr-6 shadow-brutal-sm'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-mono font-bold uppercase">
+                      {turn.speaker === 'LEARNER' ? 'You (Policy Officer)' : `${activePerspective.role}`}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">Turn {turn.turn_number}</span>
+                  </div>
+                  <p className="text-slate-900">{turn.message}</p>
+                </div>
+              ))}
+
+              {sendingTurn && (
+                <div className="p-3 bg-white border border-[#111111] rounded-xl text-xs text-slate-500 italic flex items-center gap-2">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>{activePerspective.name} is formulating their response based on policy precedent...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Turn Input Bar */}
+            {!isFinalTurn ? (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={learnerInput}
+                    onChange={(e) => setLearnerInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSendTurn(); }}
+                    placeholder={`Address ${activePerspective.role}'s concern or propose an operational mitigation...`}
+                    disabled={sendingTurn}
+                    className="flex-1 text-xs p-3 border-2 border-[#111111] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#F2A900]"
+                  />
+                  <button
+                    onClick={handleSendTurn}
+                    disabled={sendingTurn || !learnerInput.trim()}
+                    className="btn-brutal-primary !text-xs !py-3 !px-5 flex items-center gap-2"
+                  >
+                    <span>Send</span>
+                    <Send className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono">
+                  <span>Dialogue is structured to test conciseness and evidence use (max 3 turns).</span>
+                  <button
+                    onClick={() => setStep('decision')}
+                    className="text-emerald-800 font-bold hover:underline"
+                  >
+                    Skip to Decision &rarr;
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 bg-amber-50 border-2 border-[#111111] rounded-xl flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-xs text-amber-950">Dialogue Concluded</h4>
+                  <p className="text-[11px] text-amber-900">
+                    You have completed the discussion rounds. You are ready to make and justify your final policy decision.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setStep('decision')}
+                  className="btn-brutal-emerald !text-xs !py-2.5 !px-4 flex items-center gap-1.5"
+                >
+                  <span>Proceed to Final Decision</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* STEP 4: DECISION & REASONING SUBMISSION */}
+      {step === 'decision' && scenarioDetail && (
+        <div className="space-y-6">
+          <div className="card-brutal bg-white p-6 sm:p-8 space-y-6">
+            <div className="space-y-1">
+              <span className="badge-starburst badge-starburst-saffron text-xs">
+                ★ STEP 3: SUBMIT POLICY DECISION & REASONING
+              </span>
+              <h2 className="font-display font-extrabold uppercase text-xl text-[#111111] mt-1">
+                Select Your Policy Action & Explain Your Reasoning
+              </h2>
+              <p className="text-xs text-[#4B5563]">
+                There is no dogmatic single right answer. You will be evaluated across evidence use, risk awareness, people impact, and ethical balance.
+              </p>
+            </div>
+
+            {/* Decision Dilemma */}
+            <div className="p-4 rounded-xl bg-slate-50 border-2 border-[#111111]">
+              <span className="text-[10px] font-mono font-bold uppercase text-slate-500 block mb-1">
+                Decision Dilemma
+              </span>
+              <p className="text-sm font-bold text-slate-900">
+                {scenarioDetail.decision_question}
+              </p>
+            </div>
+
+            {/* Options Radio List */}
+            <div className="space-y-3">
+              <h4 className="font-display font-bold uppercase text-xs text-slate-700">
+                Select One Policy Direction:
+              </h4>
+              {scenarioDetail.options?.map((opt) => {
+                const isSelected = selectedOption?.id === opt.id;
+                return (
+                  <div
+                    key={opt.id}
+                    onClick={() => setSelectedOption(opt)}
+                    className={`p-4 rounded-xl border-2 border-[#111111] cursor-pointer transition-all flex items-start gap-3 ${
+                      isSelected 
+                        ? 'bg-amber-50 border-amber-800 shadow-brutal-sm ring-1 ring-amber-600' 
+                        : 'bg-white hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-full border-2 border-[#111111] flex items-center justify-center shrink-0 mt-0.5 ${
+                      isSelected ? 'bg-[#0B1F3A] text-white' : 'bg-white'
+                    }`}>
+                      {isSelected && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    <div>
+                      <h5 className="font-bold text-xs text-slate-900 mb-1">{opt.label}</h5>
+                      <p className="text-xs text-slate-600 leading-relaxed">{opt.description}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Mandatory Reasoning Box */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="font-display font-bold uppercase text-xs text-slate-700">
+                  Explain Your Policy Rationale & Mitigation Strategy <span className="text-red-500">*</span>
+                </label>
+                <span className="text-[10px] font-mono text-slate-400">
+                  Minimum 20 characters ({reasoning.length} entered)
                 </span>
               </div>
+              <textarea
+                rows={5}
+                value={reasoning}
+                onChange={(e) => setReasoning(e.target.value)}
+                placeholder="Detail why you chose this option, how you mitigate stakeholder risks (e.g. privacy, field burden, citizen exclusion), and what evidence from the scenario supports this..."
+                className="w-full text-xs p-3.5 border-2 border-[#111111] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#F2A900]"
+              />
+            </div>
 
-              <h4 className="font-display font-extrabold uppercase text-base">
-                {session.fallacy_challenge.question}
+            {/* Submit Action Button */}
+            <div className="flex items-center justify-between pt-4 border-t-2 border-[#111111]">
+              <button
+                onClick={() => setStep('discussion')}
+                className="px-4 py-2 text-xs font-mono font-bold text-slate-600 hover:text-slate-900"
+              >
+                &larr; Back to Discussion
+              </button>
+
+              <button
+                onClick={handleSubmitDecision}
+                disabled={evaluating || !selectedOption || reasoning.trim().length < 20}
+                className="btn-brutal-emerald !text-xs !py-3 !px-6 flex items-center gap-2 disabled:opacity-50"
+              >
+                {evaluating ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" /> Evaluating Multi-Criteria Reasoning...
+                  </>
+                ) : (
+                  <>
+                    <Scale className="w-4 h-4" /> Submit Decision for Evaluation
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 5: STRUCTURED 6-CRITERIA EVALUATION RESULT */}
+      {step === 'evaluation' && evaluationResult && scenarioDetail && (
+        <div className="space-y-6">
+          <div className="card-brutal bg-white p-6 sm:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-[#111111]">
+              <div>
+                <span className="badge-starburst badge-starburst-emerald text-xs">
+                  ★ SIMULATION COMPLETE &bull; EVALUATION REPORT
+                </span>
+                <h2 className="font-display font-black uppercase text-xl text-[#111111] mt-1">
+                  Policy Decision Evaluation & Learning Feedback
+                </h2>
+                <p className="text-xs text-[#4B5563]">
+                  Scenario: {scenarioDetail.title} (v{scenarioDetail.version})
+                </p>
+              </div>
+
+              {/* Overall Score Badge */}
+              <div className="p-4 bg-[#0B1F3A] text-white rounded-2xl border-2 border-[#111111] shadow-brutal-sm text-center">
+                <div className="text-[10px] font-mono uppercase text-[#FCD34D] font-bold">Overall Score</div>
+                <div className="text-2xl font-black">{evaluationResult.overall_score}%</div>
+              </div>
+            </div>
+
+            {/* 6 Multi-Criteria Evaluation Meters */}
+            <div className="space-y-3">
+              <h4 className="font-display font-extrabold uppercase text-xs text-slate-700">
+                Multi-Criteria Dimension Breakdown
               </h4>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {(session.fallacy_challenge.options || []).map((opt: string, oIdx: number) => (
-                  <button
-                    key={oIdx}
-                    type="button"
-                    onClick={() => handleAnswerFallacy(oIdx)}
-                    className="p-3 rounded-xl border-2 border-[#111111] bg-white hover:bg-zinc-50 text-left font-display font-bold text-xs shadow-brutal-sm transition-all"
-                  >
-                    <span>{opt}</span>
-                  </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {Object.entries(evaluationResult.criteria_scores || {}).map(([dim, score]: [string, any]) => (
+                  <div key={dim} className="p-3.5 bg-[#F8F7F2] border-2 border-[#111111] rounded-xl">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-800 capitalize mb-1.5">
+                      <span>{dim.replace(/_/g, ' ')}</span>
+                      <span className="font-mono text-emerald-800">{score}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden border border-slate-300">
+                      <div 
+                        className="bg-emerald-600 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${score}%` }}
+                      />
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
-          )}
 
-          {fallacyResult && (
-            <div className="card-brutal bg-white p-5 text-xs font-mono space-y-1">
-              <span className={`font-bold block ${fallacyResult.is_correct ? 'text-[#0F766E]' : 'text-[#C0392B]'}`}>
-                {fallacyResult.is_correct ? '✓ Correct! You spotted the flaw.' : '✗ Not quite. Keep practicing!'}
-              </span>
-              <p className="text-[#111111] font-medium">{fallacyResult.explanation}</p>
-            </div>
-          )}
-
-          {/* Expandable Decision Summary */}
-          {showJudgmentTree && session.decision_report && (
-            <div className="card-brutal-navy !bg-[#0B1F3A] !text-white p-6 sm:p-8 space-y-6">
-              <div className="flex items-center justify-between pb-3 border-b border-white/20">
-                <span className="badge-starburst badge-starburst-saffron text-xs">
-                  ★ DECISION SUMMARY
-                </span>
-                <span className="text-xs font-mono text-zinc-300 font-bold">
-                  Balanced Recommendation
-                </span>
+            {/* Detailed Feedback Sections */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+              {/* What You Did Well */}
+              <div className="p-5 bg-emerald-50 border-2 border-emerald-900 rounded-2xl space-y-2">
+                <h4 className="font-display font-bold uppercase text-xs text-emerald-950 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-700" /> What You Handled Well
+                </h4>
+                <p className="text-xs text-emerald-900 leading-relaxed whitespace-pre-line font-sans">
+                  {evaluationResult.what_you_did_well}
+                </p>
               </div>
 
-              <div className="space-y-3 font-mono text-xs text-[#111111]">
-                <div className="p-4 rounded-xl bg-white border-2 border-[#111111] space-y-2">
-                  <span className="font-bold text-[#0F766E] uppercase block">RECOMMENDED APPROACH</span>
-                  <p className="text-sm font-sans font-medium text-[#111111]">
-                    {session.decision_report.recommendation || 'Proceed with Stratified Sample Trimming supported by differential privacy masking.'}
-                  </p>
+              {/* Try Next Time / Opportunities */}
+              <div className="p-5 bg-amber-50 border-2 border-amber-900 rounded-2xl space-y-2">
+                <h4 className="font-display font-bold uppercase text-xs text-amber-950 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-700" /> Opportunities for Next Time
+                </h4>
+                <p className="text-xs text-amber-900 leading-relaxed whitespace-pre-line font-sans">
+                  {evaluationResult.try_next_time}
+                </p>
+              </div>
+            </div>
+
+            {/* Trade-offs Analysis */}
+            {evaluationResult.tradeoffs_analysis && (
+              <div className="p-5 bg-slate-50 border-2 border-[#111111] rounded-2xl space-y-2">
+                <h4 className="font-display font-bold uppercase text-xs text-slate-800 flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-slate-700" /> Policy Trade-off Analysis
+                </h4>
+                <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line font-sans">
+                  {evaluationResult.tradeoffs_analysis}
+                </p>
+              </div>
+            )}
+
+            {/* Source-Backed Notes */}
+            {evaluationResult.source_backed_notes && (
+              <div className="p-4 bg-white border border-[#111111] rounded-xl text-xs text-slate-600 flex items-start gap-2">
+                <BookOpen className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold text-slate-900">Source Precedent & Grounding: </span>
+                  {evaluationResult.source_backed_notes}
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-        </div>
-      )}
-
-      {/* What-If Modal */}
-      {showWhatIfModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="card-brutal bg-white p-6 max-w-lg w-full space-y-4 animate-in fade-in zoom-in-95 duration-150 text-[#111111]">
-            <div className="flex items-center justify-between">
-              <span className="badge-starburst badge-starburst-saffron text-xs">
-                ★ ADD A SCENARIO TWIST
-              </span>
-              <button 
-                onClick={() => setShowWhatIfModal(false)}
-                className="text-xs font-mono font-bold text-[#111111] hover:text-black"
+            {/* Next Steps Buttons */}
+            <div className="flex items-center justify-between pt-4 border-t-2 border-[#111111]">
+              <button
+                onClick={() => { setStep('catalog'); setSelectedOption(null); setReasoning(''); }}
+                className="btn-brutal-primary !text-xs !py-2.5 !px-5 flex items-center gap-1.5"
               >
-                ✕ Close
+                <span>Try Another Scenario</span>
               </button>
+
+              <Link
+                href="/dashboard"
+                className="btn-brutal-emerald !text-xs !py-2.5 !px-5 flex items-center gap-1.5"
+              >
+                <span>View Skill Growth &rarr;</span>
+              </Link>
             </div>
-
-            <p className="text-xs text-[#111111] font-medium">
-              Introduce a real-world constraint to test how decision makers adjust (e.g. &ldquo;Vehicle survey costs increase by 30% due to fuel price changes&rdquo;).
-            </p>
-
-            <textarea
-              rows={3}
-              value={whatIfInput}
-              onChange={e => setWhatIfInput(e.target.value)}
-              placeholder="Describe the new situation or constraint..."
-              className="w-full px-3.5 py-2.5 rounded-xl border-2 border-[#111111] text-xs font-mono text-[#111111] font-medium placeholder:text-[#4B5563] bg-[#F8F7F2] focus:bg-white focus:outline-none shadow-brutal-sm"
-            />
-
-            <button
-              onClick={handleInjectConstraint}
-              className="btn-brutal-primary w-full !text-xs !py-3 font-bold"
-            >
-              Add Twist &amp; Update Discussion
-            </button>
           </div>
         </div>
       )}
 
-      {/* Auth Gate Modal */}
+      {/* Sign-in Modal */}
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         title={authModalTitle}
         message={authModalMessage}
-        returnUrl={`/debate${selectedScenarioId ? `?scenario=${selectedScenarioId}` : ''}`}
+        returnUrl="/debate"
       />
-
     </div>
   );
 }
-

@@ -155,14 +155,29 @@ class BuddyContextService:
 
         recent_debates = []
         try:
-            debates = DebateSession.objects.filter(user=user).order_by('-created_at')[:3]
-            for d in debates:
+            # First check Phase 2 VivaadSession
+            from debate.models import VivaadSession
+            vivaad_sessions = VivaadSession.objects.filter(user=user, status='EVALUATED').select_related('scenario', 'evaluation_record').order_by('-completed_at')[:3]
+            for vs in vivaad_sessions:
+                score = vs.evaluation_record.overall_score if hasattr(vs, 'evaluation_record') else None
                 recent_debates.append({
-                    'scenario_title': d.scenario.title,
-                    'status': d.status,
-                    'date': d.created_at.strftime('%d %b %Y')
+                    'scenario_title': vs.scenario.title,
+                    'status': vs.status,
+                    'score': score,
+                    'date': vs.completed_at.strftime('%d %b %Y') if vs.completed_at else vs.started_at.strftime('%d %b %Y')
                 })
-        except Exception:
+            
+            # Fallback to legacy DebateSession if none
+            if not recent_debates:
+                debates = DebateSession.objects.filter(user=user).order_by('-created_at')[:3]
+                for d in debates:
+                    recent_debates.append({
+                        'scenario_title': d.scenario.title,
+                        'status': d.status,
+                        'score': None,
+                        'date': d.created_at.strftime('%d %b %Y')
+                    })
+        except Exception as e:
             recent_debates = []
 
         # 6. Page route intelligence
