@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 from urllib import error, request
 
 from django.conf import settings
@@ -13,29 +14,52 @@ class AIServiceError(RuntimeError):
 
 
 def _call_gemini(prompt: str, api_key: str, model: str, temperature: float, max_tokens: int) -> str:
-    """Invoke Google Gemini REST API directly."""
-    clean_model = model or "gemini-1.5-flash"
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
-    payload_dict = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": temperature,
-            "maxOutputTokens": max_tokens
+    """Invoke Google Gemini REST API directly with automatic model fallback and retry."""
+    candidate_models = []
+    for m in [model, "gemini-2.5-flash", "gemini-flash-latest"]:
+        if m and m not in candidate_models:
+            candidate_models.append(m)
+
+    last_err = None
+
+    for m in candidate_models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
+        payload_dict = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": max_tokens
+            }
         }
-    }
-    api_request = request.Request(
-        url,
-        data=json.dumps(payload_dict).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST"
-    )
-    with request.urlopen(api_request, timeout=45) as response:
-        data = json.loads(response.read().decode("utf-8"))
-        candidates = data.get("candidates", [])
-        if candidates:
-            parts = candidates[0].get("content", {}).get("parts", [])
-            if parts and "text" in parts[0]:
-                return parts[0]["text"].strip()
+        api_request = request.Request(
+            url,
+            data=json.dumps(payload_dict).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        for attempt in range(2):
+            try:
+                with request.urlopen(api_request, timeout=45) as response:
+                    data = json.loads(response.read().decode("utf-8"))
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts and "text" in parts[0]:
+                            return parts[0]["text"].strip()
+            except error.HTTPError as http_err:
+                last_err = http_err
+                if http_err.code == 404:
+                    break
+                raise
+            except Exception as net_err:
+                last_err = net_err
+                if attempt == 0:
+                    time.sleep(0.8)
+                    continue
+                break
+
+    if last_err:
+        raise AIServiceError(f"Gemini API returned error: {last_err}") from last_err
     raise AIServiceError("Gemini returned no generated text.")
 
 

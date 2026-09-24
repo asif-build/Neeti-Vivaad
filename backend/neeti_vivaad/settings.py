@@ -271,7 +271,7 @@ SIMPLE_JWT = {
 
 # AI Integration Configuration (Gemini & OpenRouter / NVIDIA)
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
-GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-1.5-flash')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '')
 NVIDIA_API_KEY = os.getenv('NVIDIA_API_KEY', '') or OPENROUTER_API_KEY
 NVIDIA_API_BASE_URL = os.getenv('NVIDIA_API_BASE_URL', 'https://openrouter.ai/api/v1')
