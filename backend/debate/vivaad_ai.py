@@ -224,18 +224,18 @@ class DeterministicVivaadEngine:
         options = [
             {
                 "id": "opt_direct_deployment",
-                "label": f"Enact direct execution of {scenario_title} with mandatory grievance reporting",
-                "summary": f"Prioritize immediate civic benefit under {scenario_title} while mandating regular compliance monitoring across operational divisions."
+                "label": "Enact direct execution with mandatory grievance reporting",
+                "summary": "Prioritize immediate civic benefit and service delivery while mandating regular compliance monitoring across operational divisions."
             },
             {
                 "id": "opt_targeted_phasing",
-                "label": f"Adopt a staged rollout of {scenario_title} conditioned on divisional resource readiness",
-                "summary": f"Deploy first in priority administrative units to validate frontline operational feasibility and citizen safeguards."
+                "label": "Adopt a staged rollout conditioned on divisional resource readiness",
+                "summary": "Deploy first in priority administrative units to validate frontline operational feasibility and citizen safeguards."
             },
             {
                 "id": "opt_statutory_review",
-                "label": f"Mandate comprehensive procedural audits and legal alignment prior to notifying {scenario_title}",
-                "summary": f"Resolve statutory uncertainties and resource constraints before binding field teams to implementation timelines."
+                "label": "Mandate comprehensive procedural audits and legal alignment prior to deployment",
+                "summary": "Resolve statutory uncertainties and resource constraints before binding field teams to implementation timelines."
             }
         ]
 
@@ -778,7 +778,18 @@ Title: {title}
 Situation: {situation}
 Decision Question: {decision_question}
 
-Return JSON with "title", "situation", "decision_question", "objective", "constraints", "affected_people", "risks", "options", and 3-4 "perspectives" (each with name, role, primary_concern, objective, position, key_questions).
+Requirements:
+- "title": Clean concise scenario title
+- "situation": Detailed background of the dilemma
+- "decision_question": The specific administrative question to decide
+- "objective": The overarching public welfare objective
+- "constraints": List of 3 realistic administrative constraints
+- "affected_people": List of 3 affected stakeholder groups
+- "risks": List of 3 governance/operational risks
+- "options": Exactly 3 distinct policy decisions. Each option must have "id", "label", and "summary". The "label" MUST be a clean, concise administrative action phrase (e.g. "Proceed with phased rollout across selected pilot blocks"). NEVER concatenate or repeat the scenario text or question into the option label.
+- "perspectives": 3-4 diverse civil service perspectives (each with name, role, avatar_color, primary_concern, objective, position, key_questions).
+
+Return JSON only with these keys.
 """
         try:
             raw = generate_text(prompt, temperature=0.3, max_tokens=3000)
@@ -788,6 +799,10 @@ Return JSON with "title", "situation", "decision_question", "objective", "constr
                 clean = fenced.group(1).strip()
             parsed = json.loads(clean)
             if "perspectives" in parsed and "options" in parsed:
+                for opt in parsed.get("options", []):
+                    lbl = opt.get("label", "")
+                    if len(lbl) > 100 or situation[:35] in lbl:
+                        opt["label"] = re.split(r'[?.!]', lbl)[0][:80].strip()
                 parsed["evaluation_criteria"] = STANDARD_EVALUATION_CRITERIA
                 return parsed
         except Exception:

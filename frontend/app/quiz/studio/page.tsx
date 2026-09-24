@@ -7,7 +7,7 @@ import {
   AlertCircle, ArrowRight, RefreshCw, Trash2, Edit3, Plus, 
   Eye, Check, ShieldCheck, ChevronRight, FileCheck, Layers, Award
 } from 'lucide-react';
-import { authFetch, getAccessToken } from '../../utils/api';
+import { authFetch, getAccessToken, safeJson } from '../../utils/api';
 import { AuthModal } from '../../components/AuthModal';
 
 interface CompetencyOption {
@@ -125,9 +125,9 @@ export default function KnowledgeCheckStudio() {
 
   const loadCompetencies = async () => {
     try {
-      const res = await fetch('/api/assessment/competencies/');
+      const res = await authFetch('/api/assessment/competencies/');
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeJson(res);
         setCompetencies(data.competencies || []);
         if (data.competencies?.length > 0 && !selectedCompetencyId) {
           setSelectedCompetencyId(data.competencies[0].id);
@@ -142,9 +142,11 @@ export default function KnowledgeCheckStudio() {
     setLoadingDashboard(true);
     try {
       const res = await authFetch('/api/assessment/studio/dashboard/');
+      const data = await safeJson(res);
       if (res.ok) {
-        const data = await res.json();
         setDashboardQuizzes(data.quizzes || []);
+      } else {
+        throw new Error(data.error || data.detail || 'Failed to load dashboard.');
       }
     } catch (e: any) {
       setError(e.message || 'Failed to load dashboard.');
@@ -204,9 +206,9 @@ export default function KnowledgeCheckStudio() {
         });
       }
 
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) {
-        throw new Error(data.error || "We couldn't read this document. Please try another file.");
+        throw new Error(data.error || data.detail || "We couldn't read this document. Please try another file.");
       }
 
       setUploadedDocInfo(data);
@@ -242,9 +244,9 @@ export default function KnowledgeCheckStudio() {
         })
       });
 
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) {
-        throw new Error(data.error || "We couldn't prepare the knowledge check. Please try again.");
+        throw new Error(data.error || data.detail || "We couldn't prepare the knowledge check. Please try again.");
       }
 
       setCurrentQuiz(data);
@@ -268,8 +270,8 @@ export default function KnowledgeCheckStudio() {
           question_id: qId
         })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Regeneration failed.");
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || data.detail || "Regeneration failed.");
 
       setCurrentQuiz(prev => {
         if (!prev) return null;
@@ -294,8 +296,8 @@ export default function KnowledgeCheckStudio() {
           question_id: qId
         })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Deletion failed.");
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || data.detail || "Deletion failed.");
 
       setCurrentQuiz(prev => {
         if (!prev) return null;
@@ -324,8 +326,8 @@ export default function KnowledgeCheckStudio() {
           questions: currentQuiz.questions
         })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to save draft.");
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || data.detail || "Failed to save draft.");
       showNotification("Draft saved successfully.");
     } catch (e: any) {
       setError(e.message);
@@ -346,8 +348,8 @@ export default function KnowledgeCheckStudio() {
       const res = await authFetch(`/api/assessment/studio/${currentQuiz.quiz_id}/publish/`, {
         method: 'POST'
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Publishing failed.");
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || data.detail || "Publishing failed.");
       setPublishSuccess(data);
       setCurrentQuiz(prev => prev ? { ...prev, status: 'PUBLISHED' } : null);
       showNotification("Knowledge Check published! It is now live for civil servants.");
@@ -380,8 +382,8 @@ export default function KnowledgeCheckStudio() {
           options: newQOptions.filter(o => o.text.trim())
         })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to add question.");
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || data.detail || "Failed to add question.");
 
       setCurrentQuiz(prev => {
         if (!prev) return null;

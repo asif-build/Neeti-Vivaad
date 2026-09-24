@@ -47,11 +47,11 @@ class BuddyService:
         # Determine actionable navigation button
         action_button = cls._determine_action_button(clean_msg, user_context)
 
-        # 1. Try generating through Gemini if API key is present
-        api_key = getattr(settings, 'GEMINI_API_KEY', '') or os.getenv('GEMINI_API_KEY', '')
-        if api_key:
+        # 1. Try generating through AI (OpenRouter / NVIDIA / Gemini) if API key is present
+        ai_key = getattr(settings, 'OPENROUTER_API_KEY', '') or getattr(settings, 'NVIDIA_API_KEY', '') or getattr(settings, 'GEMINI_API_KEY', '')
+        if ai_key:
             try:
-                ai_reply = cls._call_gemini_buddy(clean_msg, user_context, api_key, is_hindi)
+                ai_reply = cls._call_ai_buddy(clean_msg, user_context, is_hindi)
                 if ai_reply:
                     return {
                         'message': ai_reply,
@@ -62,7 +62,7 @@ class BuddyService:
                         'subtitle': user_context.get('subtitle', 'Your civil service companion')
                     }
             except Exception as e:
-                print(f"[BuddyService] Gemini API call fallback: {e}")
+                print(f"[BuddyService] AI API call fallback: {e}")
 
         # 2. Grounded Deterministic Fallback Engine
         fallback_reply = cls._generate_grounded_fallback(clean_msg, user_context, is_hindi)
@@ -287,3 +287,21 @@ CRITICAL: If the answer cannot be determined from the user's data or known platf
             return ["How does Neeti Vivaad work?", "What are these perspectives?", "How is my decision evaluated?"]
         else:
             return ["What should I learn next?", "How do I upload my resume?", "How does Neeti Vivaad work?", "What is Neeti Saarthi?"]
+
+    @classmethod
+    def _call_ai_buddy(cls, message: str, context: dict, is_hindi: bool = False) -> str | None:
+        """Call AI provider to generate personalized official companion reply."""
+        from neeti_vivaad.ai import generate_text
+        user = context.get('user', {})
+        role = user.get('designation', 'Civil Servant')
+        dept = user.get('department', 'Government of India')
+        system_instruction = (
+            "You are Neeti Saarthi Buddy, an intelligent and encouraging AI learning companion for Indian civil servants and statistical officers. "
+            "Respond concisely in 2 to 3 sentences. Be practical, official, and constructive. "
+            f"The officer is a {role} in {dept}. "
+            f"{'Answer in polite, clear Hindi.' if is_hindi else 'Answer in professional English.'}"
+        )
+        prompt = f"{system_instruction}\n\nOfficer: {message}\nNeeti Saarthi Buddy:"
+        reply = generate_text(prompt, temperature=0.3, max_tokens=600)
+        return reply.strip()
+

@@ -7,7 +7,7 @@ import {
   ArrowRight, RefreshCw, Clock, Award, ChevronRight, FileText,
   HelpCircle, BarChart3, Check, Filter, Search
 } from 'lucide-react';
-import { authFetch, getAccessToken } from '../utils/api';
+import { authFetch, getAccessToken, safeJson } from '../utils/api';
 import { AuthModal } from '../components/AuthModal';
 
 interface PublishedCheck {
@@ -97,9 +97,9 @@ export default function KnowledgeCheckLearnerPage() {
     setLoadingCatalog(true);
     setError(null);
     try {
-      const res = await fetch('/api/assessment/checks/');
+      const res = await authFetch('/api/assessment/checks/');
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeJson(res);
         setCatalog(data.checks || []);
       }
     } catch (e: any) {
@@ -118,9 +118,9 @@ export default function KnowledgeCheckLearnerPage() {
     setError(null);
 
     try {
-      const res = await fetch(`/api/assessment/checks/${checkId}/`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to load Knowledge Check.');
+      const res = await authFetch(`/api/assessment/checks/${checkId}/`);
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || data.detail || 'Failed to load Knowledge Check.');
 
       setActiveCheck(data);
     } catch (e: any) {
@@ -166,8 +166,8 @@ export default function KnowledgeCheckLearnerPage() {
         body: JSON.stringify({ answers: formattedAnswers })
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "We couldn't save your answers. Please try again.");
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || data.detail || "We couldn't save your answers. Please try again.");
 
       setResult(data);
 

@@ -8,6 +8,7 @@ import {
   Trash2, Edit3, X, RefreshCw, ArrowRight, Play, 
   Layers, Clock, HelpCircle, Sparkles
 } from 'lucide-react';
+import { authFetch, safeJson } from '../../utils/api';
 
 interface ReferenceDoc {
   id: number;
@@ -147,29 +148,19 @@ export default function ScenarioManagerPage() {
     setLoading(true);
     setError(null);
     try {
-      let resScenarios = await fetch('/api/admin/scenarios/', {
-        headers: { 'X-User-Role': localStorage.getItem('user_role') || 'ADMIN' }
-      }).catch(() => null);
-
-      if (!resScenarios || !resScenarios.ok) {
-        resScenarios = await fetch('http://localhost:8000/api/admin/scenarios/', {
-          headers: { 'X-User-Role': localStorage.getItem('user_role') || 'ADMIN' }
-        }).catch(() => null);
-      }
+      const resScenarios = await authFetch('/api/admin/scenarios/').catch(() => null);
 
       if (resScenarios && resScenarios.ok) {
-        const dataScenarios = await resScenarios.json();
+        const dataScenarios = await safeJson(resScenarios);
         setScenarios(dataScenarios.scenarios && dataScenarios.scenarios.length > 0 ? dataScenarios.scenarios : defaultScenarios);
       } else {
         setScenarios(defaultScenarios);
       }
 
-      let resRefs = await fetch('/api/admin/reference-documents/', {
-        headers: { 'X-User-Role': localStorage.getItem('user_role') || 'ADMIN' }
-      }).catch(() => null);
+      const resRefs = await authFetch('/api/admin/reference-documents/').catch(() => null);
 
       if (resRefs && resRefs.ok) {
-        const dataRefs = await resRefs.json();
+        const dataRefs = await safeJson(resRefs);
         setAllRefs(dataRefs.reference_documents || []);
       }
     } catch {
@@ -194,12 +185,8 @@ export default function ScenarioManagerPage() {
     }
 
     try {
-      const res = await fetch('http://localhost:8000/api/admin/scenarios/', {
+      const res = await authFetch('/api/admin/scenarios/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Role': localStorage.getItem('user_role') || 'ADMIN'
-        },
         body: JSON.stringify({
           title: newTitle,
           category: newCategory,
@@ -212,9 +199,9 @@ export default function ScenarioManagerPage() {
         })
       });
 
-      const json = await res.json();
+      const json = await safeJson(res);
       if (!res.ok) {
-        throw new Error(json.error || 'Failed to create scenario.');
+        throw new Error(json.error || json.detail || 'Failed to create scenario.');
       }
 
       // Reset form & reload
@@ -241,12 +228,8 @@ export default function ScenarioManagerPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:8000/api/admin/scenarios/${selectedConstraintScenario.id}/constraints/`, {
+      const res = await authFetch(`/api/admin/scenarios/${selectedConstraintScenario.id}/constraints/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Role': localStorage.getItem('user_role') || 'ADMIN'
-        },
         body: JSON.stringify({
           name: conName,
           description: conDesc,
@@ -272,11 +255,9 @@ export default function ScenarioManagerPage() {
     setSelectedAnalyticsScenario(scenario);
     setAnalyticsData(null);
     try {
-      const res = await fetch(`http://localhost:8000/api/admin/scenarios/${scenario.id}/analytics/`, {
-        headers: { 'X-User-Role': localStorage.getItem('user_role') || 'ADMIN' }
-      });
+      const res = await authFetch(`/api/admin/scenarios/${scenario.id}/analytics/`);
       if (res.ok) {
-        const json = await res.json();
+        const json = await safeJson(res);
         setAnalyticsData(json);
       }
     } catch (err) {
@@ -287,9 +268,8 @@ export default function ScenarioManagerPage() {
   const handleDeleteScenario = async (id: number) => {
     if (!confirm('Are you sure you want to delete this decision simulation scenario?')) return;
     try {
-      await fetch(`http://localhost:8000/api/admin/scenarios/${id}/`, {
-        method: 'DELETE',
-        headers: { 'X-User-Role': localStorage.getItem('user_role') || 'ADMIN' }
+      await authFetch(`/api/admin/scenarios/${id}/`, {
+        method: 'DELETE'
       });
       fetchScenarios();
     } catch (err) {

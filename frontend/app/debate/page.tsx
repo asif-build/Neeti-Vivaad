@@ -10,7 +10,7 @@ import {
   ChevronDown, HelpCircle, Eye, Edit3, 
   LayoutGrid, BarChart2, Mic, MicOff, Volume2, Sparkles, ChevronUp
 } from 'lucide-react';
-import { authFetch, getAccessToken } from '../utils/api';
+import { authFetch, getAccessToken, getApiBaseUrl } from '../utils/api';
 import { AuthModal } from '../components/AuthModal';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -267,7 +267,7 @@ function NeetiVivaadContent() {
   const fetchScenarios = async () => {
     try {
       setCatalogLoading(true);
-      const res = await fetch('/api/debate/scenarios/');
+      const res = await authFetch('/api/debate/scenarios/');
       if (res.ok) {
         const data = await res.json();
         setScenarios(data.scenarios || []);
@@ -287,7 +287,7 @@ function NeetiVivaadContent() {
   const loadScenarioDetail = async (scenarioId: number): Promise<ScenarioDetail | null> => {
     try {
       setLoadingScenario(true);
-      const res = await fetch(`/api/debate/scenarios/${scenarioId}/`);
+      const res = await authFetch(`/api/debate/scenarios/${scenarioId}/`);
       if (res.ok) {
         const data = await res.json();
         setCurrentScenario(data);
@@ -302,13 +302,57 @@ function NeetiVivaadContent() {
     }
   };
 
-  // Check URL query param ?scenario=<id>
+  // Check URL query param ?scenario=<id>&session=<id> or localStorage on mount/refresh
   useEffect(() => {
-    const queryScenarioId = searchParams.get('scenario');
+    const queryScenarioId = searchParams.get('scenario') || (typeof window !== 'undefined' ? localStorage.getItem('neeti_vivaad_last_scenario') : null);
+    const querySessionId = searchParams.get('session') || (typeof window !== 'undefined' ? localStorage.getItem('neeti_vivaad_last_session') : null);
+
     if (queryScenarioId && !activeSession) {
-      const id = parseInt(queryScenarioId, 10);
-      if (!isNaN(id)) {
-        loadScenarioDetail(id);
+      const sId = parseInt(queryScenarioId, 10);
+      if (!isNaN(sId)) {
+        loadScenarioDetail(sId).then((scen) => {
+          if (scen && querySessionId) {
+            const sessId = parseInt(querySessionId, 10);
+            if (!isNaN(sessId)) {
+              authFetch(`/api/debate/sessions/${sessId}/result/`)
+                .then(async (res) => {
+                  if (res.ok) {
+                    const resData = await res.json();
+                    setActiveSession({
+                      session_id: sessId,
+                      scenario_id: sId,
+                      scenario_title: scen.title,
+                      version: scen.version,
+                      status: 'EVALUATED'
+                    });
+                    setEvaluationResult(resData.evaluation);
+                    if (resData.decision) {
+                      setSelectedOptionId(resData.decision.selected_option_label || '');
+                      setReasoningText(resData.decision.reasoning || '');
+                    }
+                    setCurrentStage('learn');
+                  } else {
+                    setActiveSession({
+                      session_id: sessId,
+                      scenario_id: sId,
+                      scenario_title: scen.title,
+                      version: scen.version,
+                      status: 'IN_PROGRESS'
+                    });
+                  }
+                })
+                .catch(() => {
+                  setActiveSession({
+                    session_id: sessId,
+                    scenario_id: sId,
+                    scenario_title: scen.title,
+                    version: scen.version,
+                    status: 'IN_PROGRESS'
+                  });
+                });
+            }
+          }
+        });
       }
     }
   }, [searchParams]);
@@ -361,6 +405,11 @@ function NeetiVivaadContent() {
         setShowFullContext(false);
         setExpandedViews({});
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        try {
+          window.history.replaceState(null, '', `?scenario=${scenarioId}&session=${sessionData.session_id}`);
+          localStorage.setItem('neeti_vivaad_last_scenario', String(scenarioId));
+          localStorage.setItem('neeti_vivaad_last_session', String(sessionData.session_id));
+        } catch (_) {}
       } else {
         const errData = await res.json();
         alert(errData.error || 'Failed to start policy simulation.');
@@ -620,7 +669,8 @@ function NeetiVivaadContent() {
     try {
       const token = getAccessToken();
       const chosenOpt = currentScenario?.options?.find(o => o.id === selectedOptionId);
-      const streamRes = await fetch(`/api/debate/sessions/${activeSession.session_id}/decide-stream/`, {
+      const base = getApiBaseUrl();
+      const streamRes = await fetch(`${base}/api/debate/sessions/${activeSession.session_id}/decide-stream/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -655,6 +705,11 @@ function NeetiVivaadContent() {
                   setEvaluationResult(eventData.evaluation);
                   setCurrentStage('learn');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
+                  try {
+                    window.history.replaceState(null, '', `?scenario=${currentScenario?.id || ''}&session=${activeSession.session_id}`);
+                    localStorage.setItem('neeti_vivaad_last_scenario', String(currentScenario?.id || ''));
+                    localStorage.setItem('neeti_vivaad_last_session', String(activeSession.session_id));
+                  } catch (_) {}
                   return;
                 } else {
                   setProcessingStage({
@@ -686,6 +741,11 @@ function NeetiVivaadContent() {
           setEvaluationResult(data.evaluation);
           setCurrentStage('learn');
           window.scrollTo({ top: 0, behavior: 'smooth' });
+          try {
+            window.history.replaceState(null, '', `?scenario=${currentScenario?.id || ''}&session=${activeSession.session_id}`);
+            localStorage.setItem('neeti_vivaad_last_scenario', String(currentScenario?.id || ''));
+            localStorage.setItem('neeti_vivaad_last_session', String(activeSession.session_id));
+          } catch (_) {}
         } else {
           const err = await res.json();
           setDecisionError(err.error || 'Failed to submit decision.');
@@ -752,6 +812,12 @@ function NeetiVivaadContent() {
                 if (confirm('Return to scenarios list? Your current progress will be saved.')) {
                   setActiveSession(null);
                   setCurrentScenario(null);
+                  setEvaluationResult(null);
+                  try {
+                    localStorage.removeItem('neeti_vivaad_last_session');
+                    localStorage.removeItem('neeti_vivaad_last_scenario');
+                    window.history.replaceState(null, '', window.location.pathname);
+                  } catch (_) {}
                 }
               }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#111111] bg-white text-xs font-bold text-[#111111] hover:bg-[#F8F7F2] transition-colors cursor-pointer"

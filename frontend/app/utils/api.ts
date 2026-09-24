@@ -1,18 +1,22 @@
 export function getApiBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_API_BASE) {
-    return process.env.NEXT_PUBLIC_API_BASE.replace(/\/+$/, '');
+  const envUrl = process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || process.env.NEXT_PUBLIC_API_BASE;
+  if (envUrl) {
+    return envUrl.replace(/\/+$/, '');
   }
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     const protocol = window.location.protocol;
     if (hostname) {
-      return `${protocol}//${hostname}:8000`;
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return `${protocol}//127.0.0.1:8000`;
+      }
+      return window.location.origin;
     }
   }
-  return 'http://127.0.0.1:8000';
+  return '';
 }
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || process.env.NEXT_PUBLIC_API_BASE || '';
 
 
 export function getAccessToken(): string | null {
@@ -58,7 +62,11 @@ export function setSavedUser(user: any) {
 
 export async function authFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
   const base = getApiBaseUrl();
-  const url = endpoint.startsWith('http') ? endpoint : `${base}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  let url = endpoint;
+  if (!endpoint.startsWith('http://') && !endpoint.startsWith('https://')) {
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    url = base ? `${base}${cleanEndpoint}` : cleanEndpoint;
+  }
   const token = getAccessToken();
 
   const headers = new Headers(options.headers || {});
@@ -69,6 +77,11 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
     headers.set('Content-Type', 'application/json');
   }
 
+  const role = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
+  if (role && !headers.has('X-User-Role')) {
+    headers.set('X-User-Role', role);
+  }
+
   const res = await fetch(url, {
     ...options,
     headers
@@ -76,3 +89,33 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
 
   return res;
 }
+
+export async function safeJson(res: Response): Promise<any> {
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    try {
+      return await res.json();
+    } catch {
+      // JSON syntax error, fallback to text parsing
+    }
+  }
+
+  const text = await res.text();
+  const trimmed = text.trim();
+  if (trimmed.startsWith('<') || trimmed.startsWith('<!DOCTYPE')) {
+    if (!res.ok) {
+      throw new Error(`Server returned error (${res.status}). Please try again.`);
+    }
+    throw new Error('Server returned an unexpected response format. Please try again.');
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    if (!res.ok) {
+      throw new Error(trimmed || `Request failed with status ${res.status}`);
+    }
+    return { detail: trimmed };
+  }
+}
+

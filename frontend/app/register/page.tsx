@@ -83,7 +83,7 @@ export default function RegisterPage() {
         })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (data.email_exists || (data.error && data.error.toLowerCase().includes('already exists'))) {
           setError("An account already exists with this email address. Please log in with your account.");

@@ -11,6 +11,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
   Cell, LineChart, Line, AreaChart, Area, PieChart, Pie 
 } from 'recharts';
+import { authFetch, safeJson } from '../../utils/api';
 
 interface DomainDrilldown {
   domain_id: number;
@@ -201,18 +202,10 @@ export default function WorkforceInsightsPage() {
     setLoading(true);
     setError(null);
     try {
-      let res = await fetch('/api/admin/workforce-insights/', {
-        headers: { 'X-User-Role': localStorage.getItem('user_role') || 'ADMIN' }
-      }).catch(() => null);
-
-      if (!res || !res.ok) {
-        res = await fetch('http://localhost:8000/api/admin/workforce-insights/', {
-          headers: { 'X-User-Role': localStorage.getItem('user_role') || 'ADMIN' }
-        }).catch(() => null);
-      }
+      const res = await authFetch('/api/admin/workforce-insights/').catch(() => null);
 
       if (res && res.ok) {
-        const json = await res.json();
+        const json = await safeJson(res);
         setData(json);
       } else {
         setData(defaultWorkforceData);

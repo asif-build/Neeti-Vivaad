@@ -337,11 +337,10 @@ class GenerateQuizView(APIView):
         title = request.data.get('title', '').strip()
 
         # Bot protection verification
-        recaptcha_token = request.data.get('recaptcha_token', '')
-        captcha_valid, _ = verify_recaptcha(recaptcha_token, action='generate_quiz')
+        captcha_valid, captcha_error = verify_recaptcha(request, expected_action='generate_quiz')
         if not captcha_valid:
             return Response(
-                {'error': 'Security verification failed. Please try again.'},
+                {'error': captcha_error or 'Security verification failed. Please try again.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

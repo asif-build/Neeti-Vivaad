@@ -22,4 +22,13 @@ def custom_exception_handler(exc, context):
         return response
 
     # Delegate to standard DRF exception handler for all other exceptions
-    return exception_handler(exc, context)
+    response = exception_handler(exc, context)
+    if response is None:
+        import logging
+        logging.getLogger(__name__).exception("Unhandled API exception", exc_info=exc)
+        return Response(
+            {'error': "An internal error occurred while processing this request. Please try again."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    return response
+

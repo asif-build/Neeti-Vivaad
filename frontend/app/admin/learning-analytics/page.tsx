@@ -11,6 +11,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, 
   ResponsiveContainer, AreaChart, Area, Cell, CartesianGrid
 } from 'recharts';
+import { authFetch, safeJson } from '../../utils/api';
 
 export default function LearningAnalyticsPage() {
   const [data, setData] = useState<any>(null);
@@ -131,19 +132,10 @@ export default function LearningAnalyticsPage() {
     setLoading(true);
     setError(null);
     try {
-      // Try proxy route first, then absolute URL
-      let res = await fetch('/api/admin/learning-analytics/', {
-        headers: { 'X-User-Role': localStorage.getItem('user_role') || 'ADMIN' }
-      }).catch(() => null);
-
-      if (!res || !res.ok) {
-        res = await fetch('http://localhost:8000/api/admin/learning-analytics/', {
-          headers: { 'X-User-Role': localStorage.getItem('user_role') || 'ADMIN' }
-        }).catch(() => null);
-      }
+      const res = await authFetch('/api/admin/learning-analytics/').catch(() => null);
 
       if (res && res.ok) {
-        const json = await res.json();
+        const json = await safeJson(res);
         setData(json);
       } else {
         setData(defaultAnalyticsData);

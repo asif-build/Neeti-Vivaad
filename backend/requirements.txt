@@ -11,3 +11,5 @@ gunicorn>=21.2.0
 sentence-transformers>=2.3.0
 faiss-cpu>=1.7.4
 requests>=2.31.0
+dj-database-url>=2.1.0
+whitenoise>=6.6.0
