@@ -6,16 +6,34 @@ try:
 except ImportError:
     FAISS_AVAILABLE = False
 
-try:
-    from sentence_transformers import SentenceTransformer
-    EMBEDDER = SentenceTransformer('all-MiniLM-L6-v2')
-    ST_AVAILABLE = True
-except Exception:
-    ST_AVAILABLE = False
-    EMBEDDER = None
+# Lazy-loaded SentenceTransformer to prevent memory spikes and boot timeouts during startup on 512 MB instances
+EMBEDDER = None
+_embedder_attempted = False
+
+def get_embedder():
+    """
+    Lazy-loads SentenceTransformer on demand when first needed.
+    Keeps Django startup fast and lightweight, preventing worker timeouts or OOM kills on 512 MB instances.
+    """
+    global EMBEDDER, _embedder_attempted
+    if _embedder_attempted:
+        return EMBEDDER
+    _embedder_attempted = True
+    try:
+        from sentence_transformers import SentenceTransformer
+        EMBEDDER = SentenceTransformer('all-MiniLM-L6-v2')
+    except Exception:
+        EMBEDDER = None
+    return EMBEDDER
+
+def is_st_available():
+    return get_embedder() is not None
+
+# Backward compatibility alias
+ST_AVAILABLE = False
 
 def mock_vectorize(text_list, dim=384):
-    """Fallback lightweight TF-IDF / Hashing vectorizer if SentenceTransformers is loading."""
+    """Fallback lightweight TF-IDF / Hashing vectorizer if SentenceTransformers is unavailable."""
     vectors = []
     for text in text_list:
         v = np.zeros(dim, dtype=np.float32)
@@ -30,9 +48,10 @@ def mock_vectorize(text_list, dim=384):
     return np.array(vectors, dtype=np.float32)
 
 def get_embeddings(text_list):
-    if ST_AVAILABLE and EMBEDDER is not None:
+    embedder = get_embedder()
+    if embedder is not None:
         try:
-            return EMBEDDER.encode(text_list, convert_to_numpy=True).astype(np.float32)
+            return embedder.encode(text_list, convert_to_numpy=True).astype(np.float32)
         except Exception:
             pass
     return mock_vectorize(text_list)

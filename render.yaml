@@ -4,7 +4,7 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: chmod +x ./build.sh && ./build.sh
-    startCommand: gunicorn neeti_vivaad.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --timeout 120
+    startCommand: gunicorn neeti_vivaad.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
