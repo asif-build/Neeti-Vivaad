@@ -76,7 +76,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'neeti_vivaad.wsgi.application'
 
 # Database Configuration (Supabase PostgreSQL via DATABASE_URL, local PG via DB_HOST, or SQLite fallback)
-DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_URL = (os.getenv('DATABASE_URL') or '').strip().strip('\'"')
 if DATABASE_URL:
     import dj_database_url
     DATABASES = {
