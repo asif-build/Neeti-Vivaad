@@ -1,9 +1,10 @@
 from django.urls import path
-from .views import CourseListView, CourseDetailView, RecommendedCoursesView
+from .views import CourseListView, CourseDetailView, RecommendedCoursesView, CatalogSyncView
 from .sync_views import CourseActionStartView, CourseSyncCompletionView, UserEnrollmentsListView
 
 urlpatterns = [
     path('', CourseListView.as_view(), name='course-list'),
+    path('sync/', CatalogSyncView.as_view(), name='course-catalog-sync'),
     path('recommendations/', RecommendedCoursesView.as_view(), name='course-recommendations'),
     path('recommended/', RecommendedCoursesView.as_view(), name='course-recommended-alt'),
     path('enrollments/', UserEnrollmentsListView.as_view(), name='course-enrollments'),

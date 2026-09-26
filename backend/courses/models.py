@@ -30,6 +30,7 @@ class Course(models.Model):
     source = models.CharField(max_length=50, default='igot', db_index=True)
     content_hash = models.CharField(max_length=64, blank=True, default='')
     last_synced_at = models.DateTimeField(default=timezone.now)
+    source_updated_at = models.DateTimeField(null=True, blank=True, help_text="Official lastUpdatedOn timestamp from iGOT")
     url_verified = models.BooleanField(default=True)
     url_status = models.CharField(max_length=50, default='verified')
 
